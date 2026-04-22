@@ -453,17 +453,16 @@ function GamePage() {
 
   useEffect(() => {
     if (turn !== "b") return;
-    const rec = getEngineRecommendation(board, "b");
-    if (!rec) return;
+    if (!recommendation) return;
     setEngineThinking(true);
     const timer = setTimeout(() => {
-      setBoard(prev => applyBoardMove(prev, rec));
-      setHistory(prev => [...prev, `Black: ${formatMove(rec)}`]);
+      setBoard(prev => applyBoardMove(prev, recommendation));
+      setHistory(prev => [...prev, `Black: ${formatMove(recommendation)}`]);
       setTurn("w");
       setEngineThinking(false);
     }, 350);
     return () => clearTimeout(timer);
-  }, [board, turn]);
+  }, [recommendation, turn]);
 
   function resetGame() {
     setBoard(START.map(r => [...r]));
@@ -510,8 +509,8 @@ function GamePage() {
       <div className="page-subtitle">Play as White against a built-in engine, then switch to Analysis for recommendations.</div>
 
       <div className="tab-row">
-        <button className={`mini-tab ${activeTab==="play"?"active":""}`} onClick={() => setActiveTab("play")}>♟ Game</button>
-        <button className={`mini-tab ${activeTab==="analysis"?"active":""}`} onClick={() => setActiveTab("analysis")}>🔍 Analysis</button>
+        <button className={`mini-tab ${activeTab === "play" ? "active" : ""}`} onClick={() => setActiveTab("play")}>♟ Game</button>
+        <button className={`mini-tab ${activeTab === "analysis" ? "active" : ""}`} onClick={() => setActiveTab("analysis")}>🔍 Analysis</button>
       </div>
 
       <div className="game-controls">
