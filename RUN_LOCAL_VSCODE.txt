@@ -1,0 +1,41 @@
+Chess Academy - Run Locally in Visual Studio Code
+
+1) Install prerequisites
+- Install Node.js (v18 or newer): https://nodejs.org
+- Install Visual Studio Code: https://code.visualstudio.com
+
+2) Open this project in VS Code
+- In VS Code, go to File -> Open Folder
+- Select: /home/runner/work/Chess-Academy/Chess-Academy
+- Open a terminal in VS Code (Terminal -> New Terminal)
+
+3) Verify the repository tests
+- Run:
+  npm test
+
+4) Create a small React app shell (one-time setup)
+- From the repository root, run:
+  npm create vite@latest web -- --template react
+  cd web
+  npm install
+
+5) Copy Chess Academy source files into the React app
+- Copy these files from repo root into web/src:
+  - chess-academy.jsx
+  - chess-core.js
+
+6) Replace web/src/App.jsx with:
+
+import ChessAcademy from "./chess-academy.jsx";
+
+export default function App() {
+  return <ChessAcademy />;
+}
+
+7) Start the app
+- In the web folder, run:
+  npm run dev
+- Open the local URL shown in terminal (usually http://localhost:5173)
+
+8) Optional: stop the app
+- Press Ctrl + C in the VS Code terminal
