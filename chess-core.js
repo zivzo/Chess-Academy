@@ -27,6 +27,158 @@ export function applyMoves(moves) {
   return board;
 }
 
+export function cloneBoard(board) {
+  return board.map(rank => [...rank]);
+}
+
+export function applyBoardMove(board, move) {
+  const next = cloneBoard(board);
+  next[move.tr][move.tc] = next[move.r][move.c];
+  next[move.r][move.c] = null;
+  return next;
+}
+
+const PIECE_VALUES = { P: 1, N: 3, B: 3, R: 5, Q: 9, K: 0 };
+const KNIGHT_DELTAS = [
+  [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+  [1, -2], [1, 2], [2, -1], [2, 1],
+];
+const KING_DELTAS = [
+  [-1, -1], [-1, 0], [-1, 1],
+  [0, -1],           [0, 1],
+  [1, -1],  [1, 0],  [1, 1],
+];
+const FILES = "abcdefgh";
+
+function isInside(r, c) {
+  return r >= 0 && r < 8 && c >= 0 && c < 8;
+}
+
+function isOpponent(piece, side) {
+  return piece && piece[0] !== side;
+}
+
+export function evaluateBoard(board) {
+  let score = 0;
+  for (const row of board) {
+    for (const piece of row) {
+      if (!piece) continue;
+      const value = PIECE_VALUES[piece[1]] ?? 0;
+      score += piece[0] === "w" ? value : -value;
+    }
+  }
+  return score;
+}
+
+export function generatePseudoLegalMoves(board, side) {
+  const moves = [];
+
+  for (let r = 0; r < 8; r += 1) {
+    for (let c = 0; c < 8; c += 1) {
+      const piece = board[r][c];
+      if (!piece || piece[0] !== side) continue;
+      const kind = piece[1];
+
+      if (kind === "P") {
+        const dir = side === "w" ? -1 : 1;
+        const startRank = side === "w" ? 6 : 1;
+        const oneStep = r + dir;
+        if (isInside(oneStep, c) && !board[oneStep][c]) {
+          moves.push({ r, c, tr: oneStep, tc: c });
+          const twoStep = r + (2 * dir);
+          if (r === startRank && !board[twoStep][c]) {
+            moves.push({ r, c, tr: twoStep, tc: c });
+          }
+        }
+        for (const dc of [-1, 1]) {
+          const tr = r + dir;
+          const tc = c + dc;
+          if (isInside(tr, tc) && isOpponent(board[tr][tc], side)) {
+            moves.push({ r, c, tr, tc });
+          }
+        }
+        continue;
+      }
+
+      if (kind === "N") {
+        for (const [dr, dc] of KNIGHT_DELTAS) {
+          const tr = r + dr;
+          const tc = c + dc;
+          if (!isInside(tr, tc)) continue;
+          const target = board[tr][tc];
+          if (!target || isOpponent(target, side)) {
+            moves.push({ r, c, tr, tc });
+          }
+        }
+        continue;
+      }
+
+      if (kind === "K") {
+        for (const [dr, dc] of KING_DELTAS) {
+          const tr = r + dr;
+          const tc = c + dc;
+          if (!isInside(tr, tc)) continue;
+          const target = board[tr][tc];
+          if (!target || isOpponent(target, side)) {
+            moves.push({ r, c, tr, tc });
+          }
+        }
+        continue;
+      }
+
+      const directions = [];
+      if (kind === "B" || kind === "Q") directions.push([-1, -1], [-1, 1], [1, -1], [1, 1]);
+      if (kind === "R" || kind === "Q") directions.push([-1, 0], [1, 0], [0, -1], [0, 1]);
+
+      for (const [dr, dc] of directions) {
+        let tr = r + dr;
+        let tc = c + dc;
+        while (isInside(tr, tc)) {
+          const target = board[tr][tc];
+          if (!target) {
+            moves.push({ r, c, tr, tc });
+          } else {
+            if (isOpponent(target, side)) {
+              moves.push({ r, c, tr, tc });
+            }
+            break;
+          }
+          tr += dr;
+          tc += dc;
+        }
+      }
+    }
+  }
+
+  return moves;
+}
+
+export function getEngineRecommendation(board, side) {
+  const moves = generatePseudoLegalMoves(board, side);
+  if (moves.length === 0) return null;
+
+  let bestMove = moves[0];
+  let bestPerspectiveScore = -Infinity;
+  let bestRawScore = 0;
+
+  for (const move of moves) {
+    const nextBoard = applyBoardMove(board, move);
+    const score = evaluateBoard(nextBoard);
+    const perspectiveScore = side === "w" ? score : -score;
+    if (perspectiveScore > bestPerspectiveScore) {
+      bestPerspectiveScore = perspectiveScore;
+      bestRawScore = score;
+      bestMove = move;
+    }
+  }
+
+  return { ...bestMove, evaluation: bestRawScore };
+}
+
+export function formatMove(move) {
+  return `${FILES[move.c]}${8 - move.r}→${FILES[move.tc]}${8 - move.tr}`;
+}
+
 // ── Opening definitions ─────────────────────────────────────────────────────
 export const OPENINGS = [
   {
