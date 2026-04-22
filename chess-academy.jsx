@@ -1,6 +1,29 @@
+/**
+ * chess-academy.jsx
+ *
+ * A self-contained interactive chess learning application built with React.
+ * Targeted at players in the 800–1400 rating range, it covers:
+ *   - Opening theory with annotated, step-by-step interactive boards
+ *   - Middlegame strategy concepts
+ *   - Core chess theory articles
+ *   - A multiple-choice knowledge quiz
+ *
+ * The entire application — styles, data, and UI — lives in this single file.
+ * Drop the default export `ChessAcademy` into any React project to run it.
+ *
+ * @module chess-academy
+ */
 import { useState, useEffect, useCallback } from "react";
 
 // ── Palette & fonts injected via style tag ──────────────────────────────────
+/**
+ * Injects global CSS custom properties, fonts, and component styles into the
+ * document `<head>` as a `<style>` tag.  All colour values and spacing tokens
+ * are defined here as CSS variables so that the rest of the stylesheet can
+ * reference them via `var(--token-name)`.
+ *
+ * @returns {JSX.Element} A `<style>` element with all application styles.
+ */
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
@@ -261,12 +284,34 @@ const GlobalStyles = () => (
 );
 
 // ── Chess pieces unicode map ────────────────────────────────────────────────
+/**
+ * Maps piece codes to their Unicode chess symbol.
+ *
+ * Piece code format: `{color}{type}`
+ *   - color: `w` = White, `b` = Black
+ *   - type:  `K` King | `Q` Queen | `R` Rook | `B` Bishop | `N` Knight | `P` Pawn
+ *
+ * @type {Record<string, string>}
+ * @example
+ * PIECES["wK"] // "♔"
+ * PIECES["bP"] // "♟"
+ */
 const PIECES = {
   wK:"♔", wQ:"♕", wR:"♖", wB:"♗", wN:"♘", wP:"♙",
   bK:"♚", bQ:"♛", bR:"♜", bB:"♝", bN:"♞", bP:"♟",
 };
 
 // ── Starting position ───────────────────────────────────────────────────────
+/**
+ * The standard chess starting position represented as an 8×8 matrix.
+ *
+ * - Row 0 = rank 8 (Black's back rank)
+ * - Row 7 = rank 1 (White's back rank)
+ * - Column 0 = file a, Column 7 = file h
+ * - Each cell holds a piece code string (e.g. "wP", "bK") or `null` for empty.
+ *
+ * @type {(string|null)[][]}
+ */
 const START = [
   ["bR","bN","bB","bQ","bK","bB","bN","bR"],
   ["bP","bP","bP","bP","bP","bP","bP","bP"],
@@ -279,6 +324,29 @@ const START = [
 ];
 
 // ── Opening definitions ─────────────────────────────────────────────────────
+/**
+ * Static data for every opening in the library.
+ *
+ * Each entry contains:
+ * @typedef {Object} Opening
+ * @property {string}   id         - Unique slug used for keying and sidebar selection.
+ * @property {string}   name       - Human-readable opening name.
+ * @property {string}   color      - Accent color class applied to the card ("green" | "gold" | "red").
+ * @property {string[]} tags       - Labels displayed on the opening card.
+ * @property {1|2|3}   diff       - Difficulty level: 1 Beginner, 2 Intermediate, 3 Advanced.
+ * @property {string}   side       - Which side plays the opening ("White" | "Black").
+ * @property {string}   desc       - Short description shown on the library card.
+ * @property {string[]} moves      - Algebraic notation move list (display/chip labels only).
+ * @property {BoardStep[]} positions - One entry per board step; length equals moves.length + 1.
+ * @property {string[]} ideas      - Bullet-point strategic ideas shown in the board viewer.
+ *
+ * @typedef {Object} BoardStep
+ * @property {(string|null)[][]} board      - 8×8 board matrix for this step (built by applyMoves).
+ * @property {string}            annotation - Explanatory text shown below/beside the board.
+ * @property {[number,number][]} highlight  - [row, col] squares to highlight in green on the board.
+ *
+ * @type {Opening[]}
+ */
 const OPENINGS = [
   {
     id:"italian", name:"Italian Game", color:"green",
@@ -347,6 +415,22 @@ const OPENINGS = [
 ];
 
 // ── Apply moves helper (simplified) ────────────────────────────────────────
+/**
+ * Builds a board state by applying a sequence of moves to the starting position.
+ *
+ * Each move is a simple coordinate object — no chess-rule validation is performed;
+ * the caller is responsible for providing legal moves in the correct order.
+ *
+ * @param {{ r: number, c: number, tr: number, tc: number }[]} moves
+ *   Array of move objects where:
+ *   - `r`  / `c`  are the source row/column (0-indexed)
+ *   - `tr` / `tc` are the target row/column (0-indexed)
+ * @returns {(string|null)[][]} A new 8×8 board matrix after all moves have been applied.
+ *
+ * @example
+ * // Board after 1.e4 (White pawn from e2→e4, i.e. row 6 col 4 → row 4 col 4)
+ * const board = applyMoves([{ r: 6, c: 4, tr: 4, tc: 4 }]);
+ */
 function applyMoves(moves) {
   const board = START.map(r => [...r]);
   for (const m of moves) {
@@ -358,6 +442,17 @@ function applyMoves(moves) {
 }
 
 // ── Middlegame concepts ──────────────────────────────────────────────────────
+/**
+ * Static data for the 12 middlegame strategy concept cards.
+ *
+ * @typedef {Object} Concept
+ * @property {string} icon  - Emoji used as a visual icon on the card.
+ * @property {string} title - Short concept name (used as the card heading).
+ * @property {string} tag   - Category tag; currently all entries use "mid" (middlegame).
+ * @property {string} desc  - Full description displayed when the card is expanded.
+ *
+ * @type {Concept[]}
+ */
 const CONCEPTS = [
   { icon:"♟", title:"Weak Squares", tag:"mid", desc:"A square that can't be defended by pawns. Knights love outposts on weak squares — place yours on d5 or e6 and it becomes a monster." },
   { icon:"🏰", title:"Rook on 7th", tag:"mid", desc:"A rook on the 7th rank terrorizes the opponent's unmoved pawns and restricts their king. Often worth a pawn or more in practical play." },
@@ -374,6 +469,17 @@ const CONCEPTS = [
 ];
 
 // ── Quiz questions ───────────────────────────────────────────────────────────
+/**
+ * Questions for the knowledge quiz.
+ *
+ * @typedef {Object} QuizQuestion
+ * @property {string}   q           - The question text displayed to the student.
+ * @property {string[]} opts        - Array of answer option strings.
+ * @property {number}   correct     - Zero-based index of the correct option in `opts`.
+ * @property {string}   explanation - Explanation shown after the student answers.
+ *
+ * @type {QuizQuestion[]}
+ */
 const QUIZZES = [
   { q:"White has a bishop on c4 pointing at f7. Black's king is on e8. What is the key weakness White is exploiting?", opts:["The f7 pawn — Black's most vulnerable square in the opening","The e5 pawn — easy to win with Nxe5","Black's king being in the center","The c6 knight is pinned"], correct:0, explanation:"f7 is defended only by the king in the starting position, making it Black's biggest vulnerability in many open games. The Italian Game and Fried Liver Attack both exploit this square." },
   { q:"In the London System, what is the most important move order rule for the Bf4 bishop?", opts:["Play Bf4 after e3","Play Bf4 BEFORE playing e3 (so the bishop isn't locked in)","Play Bf4 before d4","Always develop Bf4 on move 1"], correct:1, explanation:"If White plays e3 before Bf4, the light-squared bishop gets locked behind the pawn chain. The key London move order is d4, Nf3, then Bf4 — BEFORE e3." },
@@ -384,6 +490,17 @@ const QUIZZES = [
 ];
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
+/**
+ * Home page shown when the app first loads.
+ *
+ * Displays summary stats, quick-navigation cards for the main sections,
+ * and a structured study roadmap for the 800–1400 rating range.
+ *
+ * @param {{ onNavigate: (page: string) => void }} props
+ *   - `onNavigate` – callback invoked with a page id when the user clicks a
+ *     shortcut card, causing the root component to switch the active page.
+ * @returns {JSX.Element}
+ */
 function Dashboard({ onNavigate }) {
   return (
     <div className="fade-in">
@@ -435,6 +552,15 @@ function Dashboard({ onNavigate }) {
 }
 
 // ── Openings list ────────────────────────────────────────────────────────────
+/**
+ * Displays a grid of opening cards.  Clicking a card calls `onSelect` with the
+ * full opening data object, causing the parent to replace this view with
+ * `BoardViewer`.
+ *
+ * @param {{ onSelect: (opening: Opening) => void }} props
+ *   - `onSelect` – callback invoked with the selected `Opening` object.
+ * @returns {JSX.Element}
+ */
 function OpeningsPage({ onSelect }) {
   return (
     <div className="fade-in">
@@ -458,6 +584,19 @@ function OpeningsPage({ onSelect }) {
 }
 
 // ── Interactive board viewer ─────────────────────────────────────────────────
+/**
+ * Renders a step-by-step interactive board for a single opening.
+ *
+ * The user can navigate forward/backward through `opening.positions` using the
+ * arrow buttons or by clicking individual move chips.  The current step is
+ * stored in local state (`step`).  Highlighted squares are rendered in green
+ * based on the `highlight` array of the active `BoardStep`.
+ *
+ * @param {{ opening: Opening, onBack: () => void }} props
+ *   - `opening` – the `Opening` object to display.
+ *   - `onBack`  – callback that navigates back to the `OpeningsPage` grid.
+ * @returns {JSX.Element}
+ */
 function BoardViewer({ opening, onBack }) {
   const [step, setStep] = useState(0);
   const pos = opening.positions[step];
@@ -531,6 +670,15 @@ function BoardViewer({ opening, onBack }) {
 }
 
 // ── Strategy page ────────────────────────────────────────────────────────────
+/**
+ * Renders the middlegame strategy section.
+ *
+ * Shows the 12 `CONCEPTS` as an expandable card grid.  Clicking a card toggles
+ * its expanded state (stored in `active` state) to reveal the full description.
+ * Only one card can be expanded at a time; clicking an open card collapses it.
+ *
+ * @returns {JSX.Element}
+ */
 function StrategyPage() {
   const [active, setActive] = useState(null);
   return (
@@ -562,6 +710,23 @@ function StrategyPage() {
 }
 
 // ── Quiz page ────────────────────────────────────────────────────────────────
+/**
+ * Manages the quiz flow through all `QUIZZES` questions.
+ *
+ * State:
+ * - `current`  – index of the currently displayed question.
+ * - `selected` – index of the option the student chose (null if unanswered).
+ * - `score`    – running count of correct answers.
+ * - `done`     – true after the last question has been answered and "See Results" clicked.
+ *
+ * Behavior:
+ * - Answering a question locks further input and shows color-coded feedback.
+ * - "Next Question" / "See Results" advances the quiz or shows the results screen.
+ * - The results screen displays the final score and a contextual message.
+ * - "Try Again" resets all state back to the first question.
+ *
+ * @returns {JSX.Element}
+ */
 function QuizPage() {
   const [current, setCurrent] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -634,6 +799,20 @@ function QuizPage() {
 }
 
 // ── Theory page ──────────────────────────────────────────────────────────────
+/**
+ * Static article cards covering core chess theory topics.
+ *
+ * Topics included:
+ * - The 3 Principles of the Opening
+ * - Understanding Pawn Structure
+ * - The Concept of Imbalances (Silman)
+ * - Tempo and Initiative
+ *
+ * Content is defined inline as an array of `{ title, body }` objects and
+ * rendered as `<div className="card">` elements.
+ *
+ * @returns {JSX.Element}
+ */
 function TheoryPage() {
   return (
     <div className="fade-in">
@@ -656,6 +835,25 @@ function TheoryPage() {
 }
 
 // ── Main App ─────────────────────────────────────────────────────────────────
+/**
+ * Root application component.
+ *
+ * Owns the top-level navigation state and renders the shared shell (sticky
+ * header + sidebar) together with the currently active page component.
+ *
+ * State:
+ * - `page`            – id of the active section ("home" | "openings" | "strategy" | "theory" | "quiz").
+ * - `selectedOpening` – the `Opening` object the user has drilled into, or `null`
+ *                       when the openings grid (not a specific opening) should be shown.
+ *
+ * Navigation rules:
+ * - The header nav buttons set `page` and clear `selectedOpening`.
+ * - Sidebar opening items set `page` to "openings" and set `selectedOpening` directly.
+ * - Sidebar concept items navigate to "strategy" without selecting an opening.
+ * - `BoardViewer`'s Back button clears `selectedOpening` (returns to the grid).
+ *
+ * @returns {JSX.Element}
+ */
 export default function ChessAcademy() {
   const [page, setPage] = useState("home");
   const [selectedOpening, setSelectedOpening] = useState(null);
