@@ -17,7 +17,7 @@ describe('A01 Broken Access Control', () => {
   });
 
   it('no admin/privileged modes exist in the bot levels', async () => {
-    const { BOT_LEVELS } = await import('../data/bots.js');
+    const { BOT_LEVELS } = await import('../../data/bots.js');
     // All bot levels are publicly accessible — no hidden admin level
     for (const bot of BOT_LEVELS) {
       expect(typeof bot.rating).toBe('number');
@@ -49,8 +49,8 @@ describe('A03 Injection — Move input validation', () => {
   });
 
   it('getLegalMoves rejects moves from out-of-bounds squares', async () => {
-    const { getLegalMoves } = await import('../chess/moves.js');
-    const { START_BOARD } = await import('../chess/constants.js');
+    const { getLegalMoves } = await import('../../chess/moves.js');
+    const { START_BOARD } = await import('../../chess/constants.js');
     const cr = { wK:true,wQ:true,bK:true,bQ:true };
     // Out-of-bounds r/c should return empty array (no piece there)
     const moves = getLegalMoves(START_BOARD, -1, 4, null, cr, 'w');
@@ -58,8 +58,8 @@ describe('A03 Injection — Move input validation', () => {
   });
 
   it('applyMove does not execute arbitrary code via move object', async () => {
-    const { applyMove } = await import('../chess/moves.js');
-    const { START_BOARD } = await import('../chess/constants.js');
+    const { applyMove } = await import('../../chess/moves.js');
+    const { START_BOARD } = await import('../../chess/constants.js');
     // A well-formed move is just a plain data object; applyMove only reads
     // r, c, tr, tc, isCastle, isEnPassant, promotion. Extra properties are ignored.
     const move = { r: 6, c: 4, tr: 4, tc: 4, __proto__: null, evil: 'drop table' };
@@ -126,8 +126,8 @@ describe('A09 Logging — no sensitive data in console output', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const { applyMove, getAllLegalMoves } = await import('../chess/moves.js');
-    const { START_BOARD } = await import('../chess/constants.js');
+    const { applyMove, getAllLegalMoves } = await import('../../chess/moves.js');
+    const { START_BOARD } = await import('../../chess/constants.js');
     const cr = { wK:true,wQ:true,bK:true,bQ:true };
 
     // Execute some moves — engine should not log anything
@@ -171,7 +171,7 @@ describe('XSS via chess notation output', () => {
   });
 
   it('piece unicode values are safe for React text rendering', async () => {
-    const { PIECE_UNICODE } = await import('../chess/constants.js');
+    const { PIECE_UNICODE } = await import('../../chess/constants.js');
     // Unicode chess symbols are rendered as text content, not HTML
     // React escapes text content by default — these are all single unicode chars
     for (const [key, symbol] of Object.entries(PIECE_UNICODE)) {

@@ -43,7 +43,7 @@ describe('XSS — Move notation output', () => {
 // ── Bot level data ───────────────────────────────────────────────────────────
 describe('XSS — Bot level data safety', () => {
   it('bot names and descriptions contain no HTML tags', async () => {
-    const { BOT_LEVELS } = await import('../data/bots.js');
+    const { BOT_LEVELS } = await import('../../data/bots.js');
     const HTML_TAG_PATTERN = /<[^>]+>/;
     for (const bot of BOT_LEVELS) {
       expect(HTML_TAG_PATTERN.test(bot.name),       `bot name "${bot.name}" should not contain HTML`).toBe(false);
@@ -52,7 +52,7 @@ describe('XSS — Bot level data safety', () => {
   });
 
   it('bot names do not contain script-injection patterns', async () => {
-    const { BOT_LEVELS } = await import('../data/bots.js');
+    const { BOT_LEVELS } = await import('../../data/bots.js');
     for (const bot of BOT_LEVELS) {
       expect(bot.name.toLowerCase().includes('script')).toBe(false);
       expect(bot.name.toLowerCase().includes('javascript')).toBe(false);
