@@ -88,7 +88,7 @@ test("getEngineRecommendation prioritizes winning material", () => {
   board[7][4] = "wK";
   board[0][4] = "bK";
   board[4][3] = "wQ";
-  board[4][4] = "bR";
+  board[3][3] = "bR";
   board[4][7] = "bQ";
 
   const rec = getEngineRecommendation(board, "w");
