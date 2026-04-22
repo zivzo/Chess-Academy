@@ -5,6 +5,9 @@ import {
   OPENINGS,
   CONCEPTS,
   QUIZZES,
+  createInitialBoard,
+  getLegalMoves,
+  applyLocalMove,
   generatePseudoLegalMoves,
   getEngineRecommendation,
   applyBoardMove,
@@ -109,6 +112,12 @@ const GlobalStyles = () => (
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
       margin-bottom: 1.25rem;
     }
+    .card-clickable {
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font: inherit;
+    }
     .card-title {
       font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700;
       color: var(--brown); margin-bottom: 0.75rem;
@@ -180,6 +189,16 @@ const GlobalStyles = () => (
     .sq.dark  { background: var(--sq-dark); }
     .sq.highlight { background: var(--sq-hl) !important; }
     .sq.moved { background: var(--sq-move) !important; }
+    .sq.selected { outline: 3px solid rgba(56, 80, 200, 0.8); outline-offset: -3px; }
+    .sq.legal::after {
+      content: "";
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: rgba(30, 120, 40, 0.65);
+      position: absolute;
+    }
+    .sq.selectable { cursor: pointer; }
     .sq:hover { filter: brightness(1.07); }
 
     /* ── Move list ── */
@@ -281,6 +300,18 @@ const GlobalStyles = () => (
     .btn-outline { background: transparent; border: 1.5px solid var(--brown); color: var(--brown); }
     .btn-outline:hover { background: var(--brown); color: var(--cream); }
     .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.8rem; }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: #FFF8EE;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.25rem 0.7rem;
+      font-size: 0.78rem;
+      color: var(--brown);
+      font-weight: 600;
+    }
 
     /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 6px; }
@@ -291,7 +322,6 @@ const GlobalStyles = () => (
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   `}</style>
 );
-
 // ── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({ onNavigate }) {
   return (
@@ -330,6 +360,12 @@ function Dashboard({ onNavigate }) {
         <div className="card-body">Test your understanding of openings and strategy with 6 carefully crafted questions. Get instant explanations for each answer.</div>
         <div style={{marginTop:"1rem"}}><span className="btn btn-sm">Take Quiz →</span></div>
       </div>
+
+      <button className="card card-clickable" onClick={() => onNavigate("play")}>
+        <div className="card-title">♜ Local 2-Player Game</div>
+        <div className="card-body">Play a local over-the-board style game on the same machine. Alternate turns, make legal moves, and reset anytime.</div>
+        <div style={{marginTop:"1rem"}}><span className="tag" style={{background:"#2E1F0F",color:"#F5F0E8"}}>Start Local Game →</span></div>
+      </button>
 
       <div className="card">
         <div className="card-title">📚 Study Roadmap for 800–1400</div>
@@ -432,6 +468,128 @@ function BoardViewer({ opening, onBack }) {
             <ul style={{paddingLeft:"1.2rem",fontSize:"0.85rem",color:"#4A3F35",lineHeight:"1.9"}}>
               {opening.ideas.map((idea, i) => <li key={i}>{idea}</li>)}
             </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LocalGamePage() {
+  const [board, setBoard] = useState(() => createInitialBoard());
+  const [turn, setTurn] = useState("w");
+  const [selected, setSelected] = useState(null);
+  const [legalMoves, setLegalMoves] = useState([]);
+  const [winner, setWinner] = useState(null);
+  const [lastMove, setLastMove] = useState(null);
+
+  function colorName(color) {
+    return color === "w" ? "White" : "Black";
+  }
+
+  function reset() {
+    setBoard(createInitialBoard());
+    setTurn("w");
+    setSelected(null);
+    setLegalMoves([]);
+    setWinner(null);
+    setLastMove(null);
+  }
+
+  function onSquareClick(r, c) {
+    if (winner) return;
+
+    const piece = board[r][c];
+    const isTurnPiece = piece && piece[0] === turn;
+    const selectedMove = legalMoves.find(([tr, tc]) => tr === r && tc === c);
+
+    if (selected && selectedMove) {
+      const next = applyLocalMove(board, selected, { r, c });
+      const allPieces = next.flat();
+      const hasWhiteKing = allPieces.includes("wK");
+      const hasBlackKing = allPieces.includes("bK");
+      if (!hasWhiteKing) setWinner("b");
+      else if (!hasBlackKing) setWinner("w");
+      setBoard(next);
+      setLastMove([selected, { r, c }]);
+      setSelected(null);
+      setLegalMoves([]);
+      if (hasWhiteKing && hasBlackKing) {
+        setTurn((t) => (t === "w" ? "b" : "w"));
+      }
+      return;
+    }
+
+    if (isTurnPiece) {
+      setSelected({ r, c });
+      setLegalMoves(getLegalMoves(board, r, c));
+      return;
+    }
+
+    setSelected(null);
+    setLegalMoves([]);
+  }
+
+  const turnLabel = winner ? `${colorName(winner)} wins` : `${colorName(turn)} to move`;
+
+  return (
+    <div className="fade-in">
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"1rem",marginBottom:"1.25rem",flexWrap:"wrap"}}>
+        <div>
+          <div className="page-title" style={{marginBottom:0}}>Local Game</div>
+          <div className="page-subtitle" style={{marginBottom:0}}>Two humans on one machine.</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+          <span className="status-pill">{winner ? "🏁" : "⏱"} {turnLabel}</span>
+          <button className="btn btn-outline btn-sm" onClick={reset}>Reset</button>
+        </div>
+      </div>
+
+      <div className="board-wrap">
+        <div className="board-outer">
+          <div className="board-files">
+            {["a","b","c","d","e","f","g","h"].map((f) => <div key={f} className="board-file-label">{f}</div>)}
+          </div>
+          <div className="board-labels-row">
+            <div style={{display:"flex",flexDirection:"column"}}>
+              {[8,7,6,5,4,3,2,1].map((r) => <div key={r} className="board-rank-label">{r}</div>)}
+            </div>
+            <div className="board">
+              {board.map((row, ri) =>
+                row.map((piece, ci) => {
+                  const isLight = (ri + ci) % 2 === 0;
+                  const isSelected = selected?.r === ri && selected?.c === ci;
+                  const isLegal = legalMoves.some(([tr, tc]) => tr === ri && tc === ci);
+                  const isMoved = Boolean(lastMove?.some((sq) => sq.r === ri && sq.c === ci));
+                  const isPieceOfCurrentTurn = Boolean(piece && piece[0] === turn && !winner);
+                  const isSelectable = !winner && (isPieceOfCurrentTurn || isLegal || isSelected);
+                  const className = [
+                    "sq",
+                    isLight ? "light" : "dark",
+                    isMoved && "moved",
+                    isSelected && "selected",
+                    isLegal && "legal",
+                    isSelectable && "selectable",
+                  ].filter(Boolean).join(" ");
+                  return (
+                    <div key={`${ri}-${ci}`} className={className} onClick={() => onSquareClick(ri, ci)}>
+                      {piece ? PIECES[piece] : ""}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="move-list-wrap">
+          <div className="card">
+            <div className="card-title" style={{fontSize:"1rem"}}>How to play</div>
+            <div className="card-body">
+              Click one of your pieces, then click a highlighted square to move.
+              <br /><br />
+              Includes legal movement for all pieces, captures, and pawn promotion to queen.
+            </div>
           </div>
         </div>
       </div>
@@ -718,6 +876,7 @@ export default function ChessAcademy() {
     { id:"home", label:"🏠 Home" },
     { id:"games", label:"♟ Games" },
     { id:"openings", label:"📖 Openings" },
+    { id:"play", label:"♜ Local Game" },
     { id:"strategy", label:"⚔️ Strategy" },
     { id:"theory", label:"📚 Theory" },
     { id:"quiz", label:"🎯 Quiz" },
@@ -793,6 +952,10 @@ export default function ChessAcademy() {
                 <span className="icon">🎯</span>Take Quiz
                 <span className="sidebar-badge">6 Qs</span>
               </div>
+              <div className={`sidebar-item ${page==="play"?"active":""}`}
+                onClick={() => { setPage("play"); setSelectedOpening(null); }}>
+                <span className="icon">♜</span>Local Game
+              </div>
               <div className={`sidebar-item ${page==="theory"?"active":""}`}
                 onClick={() => { setPage("theory"); setSelectedOpening(null); }}>
                 <span className="icon">📚</span>Theory Notes
@@ -803,9 +966,35 @@ export default function ChessAcademy() {
           {/* Content */}
           <main className="content">
             {page==="home" && <Dashboard onNavigate={p => { setPage(p); setSelectedOpening(null); }} />}
+            {page==="home" && <Dashboard onNavigate={p => { setPage(p); setSelectedOpening(null); }} />}
             {page==="games" && <GamePage />}
             {page==="openings" && !selectedOpening && <OpeningsPage onSelect={o => setSelectedOpening(o)} />}
             {page==="openings" && selectedOpening && <BoardViewer opening={selectedOpening} onBack={() => setSelectedOpening(null)} />}
+            {page==="play" && <LocalGamePage />}
+            {page==="strategy" && <StrategyPage />}
+            {page==="theory" && <TheoryPage />}
+            {page==="quiz" && <QuizPage />}
+                onClick={() => { setPage("quiz"); setSelectedOpening(null); }}>
+                <span className="icon">🎯</span>Take Quiz
+                <span className="sidebar-badge">6 Qs</span>
+              </div>
+              <div className={`sidebar-item ${page==="play"?"active":""}`}
+                onClick={() => { setPage("play"); setSelectedOpening(null); }}>
+                <span className="icon">♜</span>Local Game
+              </div>
+              <div className={`sidebar-item ${page==="theory"?"active":""}`}
+                onClick={() => { setPage("theory"); setSelectedOpening(null); }}>
+                <span className="icon">📚</span>Theory Notes
+              </div>
+            </div>
+          </aside>
+
+          {/* Content */}
+          <main className="content">
+            {page==="home" && <Dashboard onNavigate={p => { setPage(p); setSelectedOpening(null); }} />}
+            {page==="openings" && !selectedOpening && <OpeningsPage onSelect={o => setSelectedOpening(o)} />}
+            {page==="openings" && selectedOpening && <BoardViewer opening={selectedOpening} onBack={() => setSelectedOpening(null)} />}
+            {page==="play" && <LocalGamePage />}
             {page==="strategy" && <StrategyPage />}
             {page==="theory" && <TheoryPage />}
             {page==="quiz" && <QuizPage />}
