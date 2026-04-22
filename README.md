@@ -46,21 +46,21 @@ Chess-Academy/
 
 | Lines | Section | Purpose |
 |---|---|---|
-| 1 | Imports | React hooks (`useState`, `useEffect`, `useCallback`) |
-| 4–261 | `GlobalStyles` | All CSS custom properties, layout, and component styles |
-| 263–267 | `PIECES` | Unicode map for white/black chess pieces |
-| 269–279 | `START` | 8×8 board matrix representing the starting position |
-| 281–347 | `OPENINGS` | Static data for all 4 openings (moves, positions, annotations) |
-| 349–358 | `applyMoves()` | Helper that builds a board state from a sequence of moves |
-| 360–374 | `CONCEPTS` | 12 middlegame strategy concept objects |
-| 376–384 | `QUIZZES` | 6 quiz question objects with options, correct answer, and explanation |
-| 386–435 | `Dashboard` | Home page component |
-| 437–458 | `OpeningsPage` | Opening library grid component |
-| 460–531 | `BoardViewer` | Interactive board viewer with move navigation |
-| 533–561 | `StrategyPage` | Middlegame concepts grid component |
-| 564–634 | `QuizPage` | Quiz flow component |
-| 636–656 | `TheoryPage` | Static theory article cards component |
-| 658–751 | `ChessAcademy` | Root app component — nav, sidebar, and page routing |
+| 16 | Imports | React hooks (only `useState` is actively used; `useEffect` and `useCallback` are imported but currently unused) |
+| 27–297 | `GlobalStyles` | All CSS custom properties, layout, and component styles |
+| 299–313 | `PIECES` | Unicode map for white/black chess pieces |
+| 315–348 | `START` | 8×8 board matrix representing the starting position |
+| 350–432 | `OPENINGS` | Static data for all 4 openings (moves, positions, annotations) |
+| 434–454 | `applyMoves()` | Helper that builds a board state from a sequence of moves |
+| 456–481 | `CONCEPTS` | 12 middlegame strategy concept objects |
+| 483–502 | `QUIZZES` | 6 quiz question objects with options, correct answer, and explanation |
+| 504–563 | `Dashboard` | Home page component |
+| 564–598 | `OpeningsPage` | Opening library grid component |
+| 600–680 | `BoardViewer` | Interactive board viewer with move navigation |
+| 682–728 | `StrategyPage` | Middlegame concepts grid component |
+| 730–814 | `QuizPage` | Quiz flow component |
+| 816–855 | `TheoryPage` | Static theory article cards component |
+| 857–949 | `ChessAcademy` | Root app component — nav, sidebar, and page routing |
 
 ---
 
