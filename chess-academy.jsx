@@ -1,12 +1,17 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   PIECES,
+  START,
   OPENINGS,
   CONCEPTS,
   QUIZZES,
   createInitialBoard,
   getLegalMoves,
   applyLocalMove,
+  generatePseudoLegalMoves,
+  getEngineRecommendation,
+  applyBoardMove,
+  formatMove,
 } from "./chess-core.js";
 
 // ── Palette & fonts injected via style tag ──────────────────────────────────
@@ -230,6 +235,27 @@ const GlobalStyles = () => (
     }
     .annotation strong { color: var(--brown); }
 
+    .game-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-bottom: 1rem; }
+    .turn-pill {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.35rem 0.8rem; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.3px;
+      background: #EEE8FF; color: #4A3080;
+    }
+    .tab-row { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+    .mini-tab {
+      border: 1px solid var(--border); background: white; color: var(--brown);
+      border-radius: 999px; font-size: 0.78rem; font-weight: 600;
+      padding: 0.35rem 0.8rem; cursor: pointer; transition: all 0.15s;
+    }
+    .mini-tab.active { background: var(--brown); color: var(--gold); border-color: var(--brown); }
+    .engine-rec {
+      background: #FFFBF2; border: 1px solid #EAD9BB; border-radius: 10px;
+      padding: 0.9rem 1rem; margin-bottom: 0.85rem;
+    }
+    .engine-rec h4 { font-size: 0.85rem; color: var(--brown); margin-bottom: 0.35rem; }
+    .engine-rec p { font-size: 0.82rem; color: #4A3F35; line-height: 1.6; }
+
     /* ── Concept pills ── */
     .concept-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.85rem; }
     .concept-card {
@@ -296,7 +322,6 @@ const GlobalStyles = () => (
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   `}</style>
 );
-
 // ── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({ onNavigate }) {
   return (
@@ -572,6 +597,151 @@ function LocalGamePage() {
   );
 }
 
+// ── Play vs engine + analysis ────────────────────────────────────────────────
+function GamePage() {
+  const [board, setBoard] = useState(() => START.map(r => [...r]));
+  const [turn, setTurn] = useState("w");
+  const [selected, setSelected] = useState(null);
+  const [movesFromSquare, setMovesFromSquare] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [activeTab, setActiveTab] = useState("play");
+  const [engineThinking, setEngineThinking] = useState(false);
+
+  const recommendation = useMemo(() => getEngineRecommendation(board, turn), [board, turn]);
+
+  useEffect(() => {
+    if (turn !== "b") return;
+    if (!recommendation) return;
+    setEngineThinking(true);
+    const timer = setTimeout(() => {
+      setBoard(prev => applyBoardMove(prev, recommendation));
+      setHistory(prev => [...prev, `Black: ${formatMove(recommendation)}`]);
+      setTurn("w");
+      setEngineThinking(false);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [recommendation, turn]);
+
+  function resetGame() {
+    setBoard(START.map(r => [...r]));
+    setTurn("w");
+    setSelected(null);
+    setMovesFromSquare([]);
+    setHistory([]);
+    setEngineThinking(false);
+  }
+
+  function onSquareClick(r, c) {
+    if (turn !== "w" || engineThinking) return;
+
+    const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
+    if (selected && chosenMove) {
+      setBoard(prev => applyBoardMove(prev, chosenMove));
+      setHistory(prev => [...prev, `White: ${formatMove(chosenMove)}`]);
+      setTurn("b");
+      setSelected(null);
+      setMovesFromSquare([]);
+      return;
+    }
+
+    const piece = board[r][c];
+    if (!piece || piece[0] !== "w") {
+      setSelected(null);
+      setMovesFromSquare([]);
+      return;
+    }
+
+    setSelected([r, c]);
+    const allWhiteMoves = generatePseudoLegalMoves(board, "w");
+    setMovesFromSquare(allWhiteMoves.filter(m => m.r === r && m.c === c));
+  }
+
+  const moveDests = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
+  const evalText = recommendation
+    ? `${recommendation.evaluation > 0 ? "+" : recommendation.evaluation < 0 ? "" : "±"}${recommendation.evaluation.toFixed(1)}`
+    : "0.0";
+
+  return (
+    <div className="fade-in">
+      <div className="page-title">Play vs Engine</div>
+      <div className="page-subtitle">Play as White against a built-in engine, then switch to Analysis for recommendations.</div>
+
+      <div className="tab-row">
+        <button className={`mini-tab ${activeTab === "play" ? "active" : ""}`} onClick={() => setActiveTab("play")}>♟ Game</button>
+        <button className={`mini-tab ${activeTab === "analysis" ? "active" : ""}`} onClick={() => setActiveTab("analysis")}>🔍 Analysis</button>
+      </div>
+
+      <div className="game-controls">
+        <span className="turn-pill">{engineThinking ? "Engine thinking..." : turn === "w" ? "White to move" : "Black to move"}</span>
+        <button className="btn btn-sm btn-outline" onClick={resetGame}>Reset Game</button>
+      </div>
+
+      <div className="board-wrap">
+        <div className="board-outer">
+          <div className="board-files">
+            {["a","b","c","d","e","f","g","h"].map(f => <div key={f} className="board-file-label">{f}</div>)}
+          </div>
+          <div className="board-labels-row">
+            <div style={{display:"flex",flexDirection:"column"}}>
+              {[8,7,6,5,4,3,2,1].map(r => <div key={r} className="board-rank-label">{r}</div>)}
+            </div>
+            <div className="board">
+              {board.map((row, ri) =>
+                row.map((piece, ci) => {
+                  const isLight = (ri + ci) % 2 === 0;
+                  const isSelected = selected && selected[0] === ri && selected[1] === ci;
+                  const canMove = moveDests.has(`${ri}-${ci}`);
+                  return (
+                    <div
+                      key={`${ri}-${ci}`}
+                      className={`sq ${isLight ? "light" : "dark"} ${isSelected || canMove ? "highlight" : ""}`}
+                      onClick={() => onSquareClick(ri, ci)}
+                    >
+                      {piece ? PIECES[piece] : ""}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="move-list-wrap">
+          {activeTab === "analysis" && (
+            <>
+              <div className="engine-rec">
+                <h4>Engine Recommendation</h4>
+                <p>
+                  {recommendation
+                    ? `${turn === "w" ? "White" : "Black"} best move: ${formatMove(recommendation)}`
+                    : "No legal moves available from this position."}
+                  <br />
+                  Evaluation (White perspective): <strong>{evalText}</strong>
+                </p>
+              </div>
+              <div className="card" style={{padding:"1rem"}}>
+                <div className="card-title" style={{fontSize:"0.92rem"}}>How to use this tab</div>
+                <div className="card-body">
+                  After each move, check the suggested move and compare it to what you played.
+                  If they differ, ask what tactical or positional idea the engine saw first.
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="move-list-title">Game Moves</div>
+          <div className="move-list">
+            {history.length === 0 && <span className="move-number">No moves yet</span>}
+            {history.map((entry, i) => (
+              <div key={i} className="move-chip">{entry}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Strategy page ────────────────────────────────────────────────────────────
 function StrategyPage() {
   const [active, setActive] = useState(null);
@@ -704,6 +874,7 @@ export default function ChessAcademy() {
 
   const NAV = [
     { id:"home", label:"🏠 Home" },
+    { id:"games", label:"♟ Games" },
     { id:"openings", label:"📖 Openings" },
     { id:"play", label:"♜ Local Game" },
     { id:"strategy", label:"⚔️ Strategy" },
@@ -765,8 +936,44 @@ export default function ChessAcademy() {
             <div className="sidebar-divider" />
 
             <div className="sidebar-section">
+              <div className="sidebar-label">Games</div>
+              <div className={`sidebar-item ${page==="games"?"active":""}`}
+                onClick={() => { setPage("games"); setSelectedOpening(null); }}>
+                <span className="icon">♟</span>Play vs Engine
+              </div>
+            </div>
+
+            <div className="sidebar-divider" />
+
+            <div className="sidebar-section">
               <div className="sidebar-label">Learning</div>
               <div className={`sidebar-item ${page==="quiz"?"active":""}`}
+                onClick={() => { setPage("quiz"); setSelectedOpening(null); }}>
+                <span className="icon">🎯</span>Take Quiz
+                <span className="sidebar-badge">6 Qs</span>
+              </div>
+              <div className={`sidebar-item ${page==="play"?"active":""}`}
+                onClick={() => { setPage("play"); setSelectedOpening(null); }}>
+                <span className="icon">♜</span>Local Game
+              </div>
+              <div className={`sidebar-item ${page==="theory"?"active":""}`}
+                onClick={() => { setPage("theory"); setSelectedOpening(null); }}>
+                <span className="icon">📚</span>Theory Notes
+              </div>
+            </div>
+          </aside>
+
+          {/* Content */}
+          <main className="content">
+            {page==="home" && <Dashboard onNavigate={p => { setPage(p); setSelectedOpening(null); }} />}
+            {page==="home" && <Dashboard onNavigate={p => { setPage(p); setSelectedOpening(null); }} />}
+            {page==="games" && <GamePage />}
+            {page==="openings" && !selectedOpening && <OpeningsPage onSelect={o => setSelectedOpening(o)} />}
+            {page==="openings" && selectedOpening && <BoardViewer opening={selectedOpening} onBack={() => setSelectedOpening(null)} />}
+            {page==="play" && <LocalGamePage />}
+            {page==="strategy" && <StrategyPage />}
+            {page==="theory" && <TheoryPage />}
+            {page==="quiz" && <QuizPage />}
                 onClick={() => { setPage("quiz"); setSelectedOpening(null); }}>
                 <span className="icon">🎯</span>Take Quiz
                 <span className="sidebar-badge">6 Qs</span>
