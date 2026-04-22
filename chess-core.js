@@ -93,7 +93,7 @@ export function generatePseudoLegalMoves(board, side) {
         for (const dc of [-1, 1]) {
           const tr = r + dir;
           const tc = c + dc;
-          if (isInside(tr, tc) && isOpponent(board[tr][tc], side)) {
+          if (isInside(tr, tc) && board[tr][tc] && isOpponent(board[tr][tc], side)) {
             moves.push({ r, c, tr, tc });
           }
         }

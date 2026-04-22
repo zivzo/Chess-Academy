@@ -500,7 +500,7 @@ function GamePage() {
 
   const moveDests = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
   const evalText = recommendation
-    ? `${recommendation.evaluation > 0 ? "+" : ""}${recommendation.evaluation.toFixed(1)}`
+    ? `${recommendation.evaluation > 0 ? "+" : recommendation.evaluation < 0 ? "" : "±"}${recommendation.evaluation.toFixed(1)}`
     : "0.0";
 
   return (
