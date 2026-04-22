@@ -16,9 +16,126 @@ export const START = [
   ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
 ];
 
+export function createInitialBoard() {
+  return START.map((row) => [...row]);
+}
+
+function isInsideBoard(r, c) {
+  return r >= 0 && r < 8 && c >= 0 && c < 8;
+}
+
+function isEnemy(piece, color) {
+  return piece && piece[0] !== color;
+}
+
+// ── Local play helpers ────────────────────────────────────────────────────────
+export function getLegalMoves(board, r, c) {
+  if (!isInsideBoard(r, c)) return [];
+  const piece = board[r][c];
+  if (!piece) return [];
+
+  const color = piece[0];
+  const type = piece[1];
+  const moves = [];
+
+  if (type === "P") {
+    const dir = color === "w" ? -1 : 1;
+    const startRow = color === "w" ? 6 : 1;
+    const oneStep = r + dir;
+    const twoStep = r + dir * 2;
+
+    if (isInsideBoard(oneStep, c) && !board[oneStep][c]) {
+      moves.push([oneStep, c]);
+      if (r === startRow && isInsideBoard(twoStep, c) && !board[twoStep][c]) {
+        moves.push([twoStep, c]);
+      }
+    }
+
+    for (const dc of [-1, 1]) {
+      const tr = r + dir;
+      const tc = c + dc;
+      if (isInsideBoard(tr, tc) && isEnemy(board[tr][tc], color)) {
+        moves.push([tr, tc]);
+      }
+    }
+    return moves;
+  }
+
+  if (type === "N") {
+    const deltas = [
+      [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+      [1, -2], [1, 2], [2, -1], [2, 1],
+    ];
+    for (const [dr, dc] of deltas) {
+      const tr = r + dr;
+      const tc = c + dc;
+      if (!isInsideBoard(tr, tc)) continue;
+      if (!board[tr][tc] || isEnemy(board[tr][tc], color)) {
+        moves.push([tr, tc]);
+      }
+    }
+    return moves;
+  }
+
+  if (type === "K") {
+    for (let dr = -1; dr <= 1; dr += 1) {
+      for (let dc = -1; dc <= 1; dc += 1) {
+        if (dr === 0 && dc === 0) continue;
+        const tr = r + dr;
+        const tc = c + dc;
+        if (!isInsideBoard(tr, tc)) continue;
+        if (!board[tr][tc] || isEnemy(board[tr][tc], color)) {
+          moves.push([tr, tc]);
+        }
+      }
+    }
+    return moves;
+  }
+
+  const directions = [];
+  if (type === "B" || type === "Q") {
+    directions.push([-1, -1], [-1, 1], [1, -1], [1, 1]);
+  }
+  if (type === "R" || type === "Q") {
+    directions.push([-1, 0], [1, 0], [0, -1], [0, 1]);
+  }
+
+  for (const [dr, dc] of directions) {
+    let tr = r + dr;
+    let tc = c + dc;
+    while (isInsideBoard(tr, tc)) {
+      if (!board[tr][tc]) {
+        moves.push([tr, tc]);
+      } else {
+        if (isEnemy(board[tr][tc], color)) moves.push([tr, tc]);
+        break;
+      }
+      tr += dr;
+      tc += dc;
+    }
+  }
+
+  return moves;
+}
+
+export function applyLocalMove(board, from, to) {
+  const next = board.map((row) => [...row]);
+  const moving = next[from.r][from.c];
+  if (!moving) return next;
+
+  next[to.r][to.c] = moving;
+  next[from.r][from.c] = null;
+
+  if (moving[1] === "P" && (to.r === 0 || to.r === 7)) {
+    next[to.r][to.c] = `${moving[0]}Q`;
+  }
+
+  return next;
+}
+
 // ── Apply moves helper (simplified) ────────────────────────────────────────
 export function applyMoves(moves) {
-  const board = START.map(r => [...r]);
+  const board = createInitialBoard();
   for (const m of moves) {
     const piece = board[m.r][m.c];
     board[m.tr][m.tc] = piece;
