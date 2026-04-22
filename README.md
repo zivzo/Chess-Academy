@@ -39,28 +39,39 @@ An interactive, single-component chess learning app built with React. Designed f
 
 ```
 Chess-Academy/
-└── chess-academy.jsx   # The entire application — styles, data, and components
+├── chess-academy.jsx          # React UI layer — styles, components, routing
+├── chess-core.js              # Pure-data module — chess content & applyMoves helper
+├── package.json               # npm metadata & test script
+├── tests/
+│   └── chess-core.test.js     # Unit tests for chess-core.js (Node built-in runner)
+└── README.md
 ```
+
+### Sections inside `chess-core.js`
+
+| Lines | Section | Purpose |
+|---|---|---|
+| 1–18 | Module header | File-level JSDoc |
+| 19–34 | `PIECES` | Unicode map for white/black chess pieces |
+| 35–47 | `START` | 8×8 board matrix representing the starting position |
+| 48–65 | `applyMoves()` | Coordinate-based board-state builder |
+| 66–97 | `OPENINGS` | Static data for all 4 openings (moves, positions, annotations) |
+| 98–114 | `CONCEPTS` | 12 middlegame strategy concept objects |
+| 115–129 | `QUIZZES` | 6 quiz question objects with options, correct answer, and explanation |
 
 ### Sections inside `chess-academy.jsx`
 
 | Lines | Section | Purpose |
 |---|---|---|
-| 16 | Imports | React hooks (only `useState` is actively used; `useEffect` and `useCallback` are imported but currently unused) |
-| 27–297 | `GlobalStyles` | All CSS custom properties, layout, and component styles |
-| 299–313 | `PIECES` | Unicode map for white/black chess pieces |
-| 315–348 | `START` | 8×8 board matrix representing the starting position |
-| 350–432 | `OPENINGS` | Static data for all 4 openings (moves, positions, annotations) |
-| 434–454 | `applyMoves()` | Helper that builds a board state from a sequence of moves |
-| 456–481 | `CONCEPTS` | 12 middlegame strategy concept objects |
-| 483–502 | `QUIZZES` | 6 quiz question objects with options, correct answer, and explanation |
-| 504–563 | `Dashboard` | Home page component |
-| 564–598 | `OpeningsPage` | Opening library grid component |
-| 600–680 | `BoardViewer` | Interactive board viewer with move navigation |
-| 682–728 | `StrategyPage` | Middlegame concepts grid component |
-| 730–814 | `QuizPage` | Quiz flow component |
-| 816–855 | `TheoryPage` | Static theory article cards component |
-| 857–949 | `ChessAcademy` | Root app component — nav, sidebar, and page routing |
+| 18–19 | Imports | React `useState` + data imports from `chess-core.js` |
+| 30–298 | `GlobalStyles` | All CSS custom properties, layout, and component styles |
+| 301–360 | `Dashboard` | Home page component |
+| 361–396 | `OpeningsPage` | Opening library grid component |
+| 397–477 | `BoardViewer` | Interactive board viewer with move navigation |
+| 479–525 | `StrategyPage` | Middlegame concepts grid component |
+| 527–611 | `QuizPage` | Quiz flow component |
+| 613–652 | `TheoryPage` | Static theory article cards component |
+| 654–746 | `ChessAcademy` | Root app component — nav, sidebar, and page routing |
 
 ---
 
@@ -120,7 +131,7 @@ An 8×8 array of piece code strings or `null`. Row 0 is Black's back rank; row 7
 
 ## Usage
 
-Import and render `ChessAcademy` as a top-level page component inside any React app:
+Import and render `ChessAcademy` as a top-level page component inside any React app. Make sure both `chess-academy.jsx` and `chess-core.js` are present in the same directory:
 
 ```jsx
 import ChessAcademy from './chess-academy';
@@ -130,7 +141,15 @@ export default function App() {
 }
 ```
 
-The component is fully self-contained — it injects its own global styles and requires no additional CSS imports.
+The component injects its own global styles and requires no additional CSS imports. All chess data is loaded from `chess-core.js` at import time.
+
+## Running Tests
+
+The test suite uses Node's built-in test runner (Node ≥ 18) and targets `chess-core.js`:
+
+```bash
+npm test
+```
 
 ---
 
