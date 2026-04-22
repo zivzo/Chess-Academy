@@ -107,6 +107,12 @@ const GlobalStyles = () => (
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
       margin-bottom: 1.25rem;
     }
+    .card-clickable {
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font: inherit;
+    }
     .card-title {
       font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700;
       color: var(--brown); margin-bottom: 0.75rem;
@@ -330,11 +336,11 @@ function Dashboard({ onNavigate }) {
         <div style={{marginTop:"1rem"}}><span className="btn btn-sm">Take Quiz →</span></div>
       </div>
 
-      <div className="card" style={{cursor:"pointer"}} onClick={() => onNavigate("play")}>
+      <button className="card card-clickable" onClick={() => onNavigate("play")}>
         <div className="card-title">♜ Local 2-Player Game</div>
         <div className="card-body">Play a local over-the-board style game on the same machine. Alternate turns, make legal moves, and reset anytime.</div>
-        <div style={{marginTop:"1rem"}}><span className="btn btn-sm">Start Local Game →</span></div>
-      </div>
+        <div style={{marginTop:"1rem"}}><span className="tag" style={{background:"#2E1F0F",color:"#F5F0E8"}}>Start Local Game →</span></div>
+      </button>
 
       <div className="card">
         <div className="card-title">📚 Study Roadmap for 800–1400</div>
@@ -452,6 +458,10 @@ function LocalGamePage() {
   const [winner, setWinner] = useState(null);
   const [lastMove, setLastMove] = useState(null);
 
+  function colorName(color) {
+    return color === "w" ? "White" : "Black";
+  }
+
   function reset() {
     setBoard(createInitialBoard());
     setTurn("w");
@@ -470,10 +480,11 @@ function LocalGamePage() {
 
     if (selected && selectedMove) {
       const next = applyLocalMove(board, selected, { r, c });
-      const hasWhiteKing = next.some((row) => row.includes("wK"));
-      const hasBlackKing = next.some((row) => row.includes("bK"));
+      const allPieces = next.flat();
+      const hasWhiteKing = allPieces.includes("wK");
+      const hasBlackKing = allPieces.includes("bK");
       if (!hasWhiteKing) setWinner("b");
-      if (!hasBlackKing) setWinner("w");
+      else if (!hasBlackKing) setWinner("w");
       setBoard(next);
       setLastMove([selected, { r, c }]);
       setSelected(null);
@@ -494,7 +505,7 @@ function LocalGamePage() {
     setLegalMoves([]);
   }
 
-  const turnLabel = winner ? `${winner === "w" ? "White" : "Black"} wins` : `${turn === "w" ? "White" : "Black"} to move`;
+  const turnLabel = winner ? `${colorName(winner)} wins` : `${colorName(turn)} to move`;
 
   return (
     <div className="fade-in">
@@ -525,7 +536,16 @@ function LocalGamePage() {
                   const isSelected = selected?.r === ri && selected?.c === ci;
                   const isLegal = legalMoves.some(([tr, tc]) => tr === ri && tc === ci);
                   const isMoved = Boolean(lastMove?.some((sq) => sq.r === ri && sq.c === ci));
-                  const className = `sq ${isLight ? "light" : "dark"} ${isMoved ? "moved" : ""} ${isSelected ? "selected" : ""} ${isLegal ? "legal" : ""} selectable`;
+                  const isPieceOfCurrentTurn = Boolean(piece && piece[0] === turn && !winner);
+                  const isSelectable = !winner && (isPieceOfCurrentTurn || isLegal || isSelected);
+                  const className = [
+                    "sq",
+                    isLight ? "light" : "dark",
+                    isMoved && "moved",
+                    isSelected && "selected",
+                    isLegal && "legal",
+                    isSelectable && "selectable",
+                  ].filter(Boolean).join(" ");
                   return (
                     <div key={`${ri}-${ci}`} className={className} onClick={() => onSquareClick(ri, ci)}>
                       {piece ? PIECES[piece] : ""}

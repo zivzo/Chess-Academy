@@ -73,8 +73,11 @@ test("applyLocalMove moves pieces without mutating input board", () => {
 test("applyLocalMove promotes pawns to queens", () => {
   const board = Array.from({ length: 8 }, () => Array(8).fill(null));
   board[1][0] = "wP";
-  const moved = applyLocalMove(board, { r: 1, c: 0 }, { r: 0, c: 0 });
-  assert.equal(moved[0][0], "wQ");
+  board[6][1] = "bP";
+  const movedWhite = applyLocalMove(board, { r: 1, c: 0 }, { r: 0, c: 0 });
+  const movedBlack = applyLocalMove(board, { r: 6, c: 1 }, { r: 7, c: 1 });
+  assert.equal(movedWhite[0][0], "wQ");
+  assert.equal(movedBlack[7][1], "bQ");
 });
 
 test("OPENINGS have consistent move/position progression and valid board shapes", () => {

@@ -126,7 +126,11 @@ export function applyLocalMove(board, from, to) {
   next[to.r][to.c] = moving;
   next[from.r][from.c] = null;
 
-  if (moving[1] === "P" && (to.r === 0 || to.r === 7)) {
+  // Promote pawn when it reaches the opposite end of the board.
+  const shouldPromote =
+    (moving[0] === "w" && to.r === 0) ||
+    (moving[0] === "b" && to.r === 7);
+  if (moving[1] === "P" && shouldPromote) {
     next[to.r][to.c] = `${moving[0]}Q`;
   }
 
