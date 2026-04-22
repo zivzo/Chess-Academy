@@ -1,7 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { START, applyMoves, OPENINGS, CONCEPTS, QUIZZES } from "../chess-core.js";
+import {
+  START,
+  applyMoves,
+  OPENINGS,
+  CONCEPTS,
+  QUIZZES,
+  generatePseudoLegalMoves,
+  evaluateBoard,
+  getEngineRecommendation,
+  applyBoardMove,
+  formatMove,
+} from "../chess-core.js";
 
 test("applyMoves returns an untouched copy of the initial board for empty input", () => {
   const board = applyMoves([]);
@@ -63,4 +74,27 @@ test("CONCEPTS and QUIZZES contain complete instructional content", () => {
     assert.ok(quiz.opts.length >= 2);
     assert.ok(quiz.correct >= 0 && quiz.correct < quiz.opts.length);
   }
+});
+
+test("generatePseudoLegalMoves provides standard opening mobility", () => {
+  const whiteMoves = generatePseudoLegalMoves(START, "w");
+  const blackMoves = generatePseudoLegalMoves(START, "b");
+  assert.equal(whiteMoves.length, 20);
+  assert.equal(blackMoves.length, 20);
+});
+
+test("getEngineRecommendation prioritizes winning material", () => {
+  const board = Array.from({ length: 8 }, () => Array(8).fill(null));
+  board[7][4] = "wK";
+  board[0][4] = "bK";
+  board[4][3] = "wQ";
+  board[3][3] = "bR";
+  board[4][7] = "bQ";
+
+  const rec = getEngineRecommendation(board, "w");
+  assert.ok(rec);
+  assert.deepEqual({ r: rec.r, c: rec.c, tr: rec.tr, tc: rec.tc }, { r: 4, c: 3, tr: 4, tc: 7 });
+  assert.equal(formatMove(rec), "d4→h4");
+  const next = applyBoardMove(board, rec);
+  assert.ok(evaluateBoard(next) > evaluateBoard(board));
 });
