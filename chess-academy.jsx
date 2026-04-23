@@ -654,7 +654,7 @@ function strengthLabel(rating) {
  */
 function formatEval(evaluation, mate) {
   if (mate !== null && mate !== undefined) {
-    return mate > 0 ? `M${mate}` : `M${mate}`;
+    return mate > 0 ? `M${mate}` : `-M${Math.abs(mate)}`;
   }
   if (evaluation === null || evaluation === undefined) return "0.0";
   const sign = evaluation > 0 ? "+" : evaluation < 0 ? "" : "±";
