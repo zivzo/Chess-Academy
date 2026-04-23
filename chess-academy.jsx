@@ -966,32 +966,7 @@ export default function ChessAcademy() {
           {/* Content */}
           <main className="content">
             {page==="home" && <Dashboard onNavigate={p => { setPage(p); setSelectedOpening(null); }} />}
-            {page==="home" && <Dashboard onNavigate={p => { setPage(p); setSelectedOpening(null); }} />}
             {page==="games" && <GamePage />}
-            {page==="openings" && !selectedOpening && <OpeningsPage onSelect={o => setSelectedOpening(o)} />}
-            {page==="openings" && selectedOpening && <BoardViewer opening={selectedOpening} onBack={() => setSelectedOpening(null)} />}
-            {page==="play" && <LocalGamePage />}
-            {page==="strategy" && <StrategyPage />}
-            {page==="theory" && <TheoryPage />}
-            {page==="quiz" && <QuizPage />}
-                onClick={() => { setPage("quiz"); setSelectedOpening(null); }}>
-                <span className="icon">🎯</span>Take Quiz
-                <span className="sidebar-badge">6 Qs</span>
-              </div>
-              <div className={`sidebar-item ${page==="play"?"active":""}`}
-                onClick={() => { setPage("play"); setSelectedOpening(null); }}>
-                <span className="icon">♜</span>Local Game
-              </div>
-              <div className={`sidebar-item ${page==="theory"?"active":""}`}
-                onClick={() => { setPage("theory"); setSelectedOpening(null); }}>
-                <span className="icon">📚</span>Theory Notes
-              </div>
-            </div>
-          </aside>
-
-          {/* Content */}
-          <main className="content">
-            {page==="home" && <Dashboard onNavigate={p => { setPage(p); setSelectedOpening(null); }} />}
             {page==="openings" && !selectedOpening && <OpeningsPage onSelect={o => setSelectedOpening(o)} />}
             {page==="openings" && selectedOpening && <BoardViewer opening={selectedOpening} onBack={() => setSelectedOpening(null)} />}
             {page==="play" && <LocalGamePage />}
