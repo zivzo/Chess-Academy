@@ -1,3 +1,15 @@
+// ── Re-export chess rules ────────────────────────────────────────────────────
+export {
+  createGameState,
+  isSquareAttacked,
+  findKing,
+  isInCheck,
+  getLegalMovesWithRules,
+  getAllLegalMoves,
+  applyMoveWithRules,
+  getGameStatus,
+} from "./chess-rules.js";
+
 // ── Chess pieces unicode map ────────────────────────────────────────────────
 export const PIECES = {
   wK: "♔", wQ: "♕", wR: "♖", wB: "♗", wN: "♘", wP: "♙",

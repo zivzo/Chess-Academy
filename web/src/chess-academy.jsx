@@ -12,6 +12,10 @@ import {
   getEngineRecommendation,
   applyBoardMove,
   formatMove,
+  createGameState,
+  getLegalMovesWithRules,
+  applyMoveWithRules,
+  getGameStatus,
 } from "./chess-core.js";
 
 // ── Palette & fonts injected via style tag ──────────────────────────────────
@@ -480,8 +484,9 @@ function LocalGamePage() {
   const [turn, setTurn] = useState("w");
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
-  const [winner, setWinner] = useState(null);
+  const [status, setStatus] = useState("playing"); // "playing" | "check" | "checkmate" | "stalemate"
   const [lastMove, setLastMove] = useState(null);
+  const [gameState, setGameState] = useState(() => createGameState());
 
   function colorName(color) {
     return color === "w" ? "White" : "Black";
@@ -492,37 +497,37 @@ function LocalGamePage() {
     setTurn("w");
     setSelected(null);
     setLegalMoves([]);
-    setWinner(null);
+    setStatus("playing");
     setLastMove(null);
+    setGameState(createGameState());
   }
 
   function onSquareClick(r, c) {
-    if (winner) return;
+    if (status === "checkmate" || status === "stalemate") return;
 
     const piece = board[r][c];
     const isTurnPiece = piece && piece[0] === turn;
-    const selectedMove = legalMoves.find(([tr, tc]) => tr === r && tc === c);
+    const selectedMove = legalMoves.find((m) => m.tr === r && m.tc === c);
 
     if (selected && selectedMove) {
-      const next = applyLocalMove(board, selected, { r, c });
-      const allPieces = next.flat();
-      const hasWhiteKing = allPieces.includes("wK");
-      const hasBlackKing = allPieces.includes("bK");
-      if (!hasWhiteKing) setWinner("b");
-      else if (!hasBlackKing) setWinner("w");
-      setBoard(next);
-      setLastMove([selected, { r, c }]);
+      const { board: nextBoard, gameState: nextGameState } =
+        applyMoveWithRules(board, selectedMove, gameState);
+      const nextTurn = turn === "w" ? "b" : "w";
+      const nextStatus = getGameStatus(nextBoard, nextTurn, nextGameState);
+
+      setBoard(nextBoard);
+      setGameState(nextGameState);
+      setLastMove([{ r: selectedMove.r, c: selectedMove.c }, { r: selectedMove.tr, c: selectedMove.tc }]);
       setSelected(null);
       setLegalMoves([]);
-      if (hasWhiteKing && hasBlackKing) {
-        setTurn((t) => (t === "w" ? "b" : "w"));
-      }
+      setTurn(nextTurn);
+      setStatus(nextStatus);
       return;
     }
 
     if (isTurnPiece) {
       setSelected({ r, c });
-      setLegalMoves(getLegalMoves(board, r, c));
+      setLegalMoves(getLegalMovesWithRules(board, r, c, gameState));
       return;
     }
 
@@ -530,7 +535,18 @@ function LocalGamePage() {
     setLegalMoves([]);
   }
 
-  const turnLabel = winner ? `${colorName(winner)} wins` : `${colorName(turn)} to move`;
+  const isGameOver = status === "checkmate" || status === "stalemate";
+  const winner = status === "checkmate" ? (turn === "w" ? "b" : "w") : null;
+  let turnLabel;
+  if (status === "checkmate") {
+    turnLabel = `Checkmate! ${colorName(winner)} wins`;
+  } else if (status === "stalemate") {
+    turnLabel = "Stalemate — Draw";
+  } else if (status === "check") {
+    turnLabel = `${colorName(turn)} is in check`;
+  } else {
+    turnLabel = `${colorName(turn)} to move`;
+  }
 
   return (
     <div className="fade-in">
@@ -540,7 +556,7 @@ function LocalGamePage() {
           <div className="page-subtitle" style={{marginBottom:0}}>Two humans on one machine.</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
-          <span className="status-pill">{winner ? "🏁" : "⏱"} {turnLabel}</span>
+          <span className="status-pill">{isGameOver ? "🏁" : status === "check" ? "⚠️" : "⏱"} {turnLabel}</span>
           <button className="btn btn-outline btn-sm" onClick={reset}>Reset</button>
         </div>
       </div>
@@ -559,10 +575,10 @@ function LocalGamePage() {
                 row.map((piece, ci) => {
                   const isLight = (ri + ci) % 2 === 0;
                   const isSelected = selected?.r === ri && selected?.c === ci;
-                  const isLegal = legalMoves.some(([tr, tc]) => tr === ri && tc === ci);
+                  const isLegal = legalMoves.some((m) => m.tr === ri && m.tc === ci);
                   const isMoved = Boolean(lastMove?.some((sq) => sq.r === ri && sq.c === ci));
-                  const isPieceOfCurrentTurn = Boolean(piece && piece[0] === turn && !winner);
-                  const isSelectable = !winner && (isPieceOfCurrentTurn || isLegal || isSelected);
+                  const isPieceOfCurrentTurn = Boolean(piece && piece[0] === turn && !isGameOver);
+                  const isSelectable = !isGameOver && (isPieceOfCurrentTurn || isLegal || isSelected);
                   const className = [
                     "sq",
                     isLight ? "light" : "dark",
@@ -588,7 +604,7 @@ function LocalGamePage() {
             <div className="card-body">
               Click one of your pieces, then click a highlighted square to move.
               <br /><br />
-              Includes legal movement for all pieces, captures, and pawn promotion to queen.
+              Includes all standard rules: castling, en passant, pawn promotion, check, checkmate, and stalemate detection.
             </div>
           </div>
         </div>
