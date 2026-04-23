@@ -320,6 +320,21 @@ const GlobalStyles = () => (
     .quiz-feedback.correct { background: #F0F9F4; color: #1E5A35; border: 1px solid #A8D5B8; }
     .quiz-feedback.wrong { background: #FDF2F1; color: #7A1F1F; border: 1px solid #F0B0A8; }
 
+    /* ── Quiz board (smaller) ── */
+    .quiz-board-wrap { display: flex; justify-content: center; margin-bottom: 1.25rem; }
+    .quiz-board-outer { flex-shrink: 0; }
+    .quiz-board-files { display: flex; padding-left: 18px; }
+    .quiz-board-file-label { width: 40px; text-align: center; font-size: 0.6rem; color: var(--muted); font-weight: 500; }
+    .quiz-board-rank-label { width: 18px; text-align: center; font-size: 0.6rem; color: var(--muted); font-weight: 500; line-height: 40px; }
+    .quiz-board {
+      display: grid; grid-template-columns: repeat(8, 40px); grid-template-rows: repeat(8, 40px);
+      border: 2px solid var(--brown); border-radius: 4px; overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    .quiz-board .sq {
+      width: 40px; height: 40px; font-size: 1.5rem; cursor: default;
+    }
+
     /* ── Dashboard stats ── */
     .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.85rem; margin-bottom: 1.5rem; }
     .stat-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; }
@@ -1004,6 +1019,34 @@ function QuizPage() {
         <div className="progress-wrap"><div className="progress-fill" style={{width:`${((current)/QUIZZES.length)*100}%`}}/></div>
       </div>
       <div className="card">
+        {q.board && (
+          <div className="quiz-board-wrap">
+            <div className="quiz-board-outer">
+              <div className="quiz-board-files">
+                {["a","b","c","d","e","f","g","h"].map(f => <div key={f} className="quiz-board-file-label">{f}</div>)}
+              </div>
+              <div style={{display:"flex",alignItems:"center"}}>
+                <div style={{display:"flex",flexDirection:"column"}}>
+                  {[8,7,6,5,4,3,2,1].map(r => <div key={r} className="quiz-board-rank-label">{r}</div>)}
+                </div>
+                <div className="quiz-board">
+                  {q.board.map((row, ri) =>
+                    row.map((piece, ci) => {
+                      const isLight = (ri + ci) % 2 === 0;
+                      const isHL = q.highlight && q.highlight.some(([hr,hc]) => hr === ri && hc === ci);
+                      return (
+                        <div key={`${ri}-${ci}`}
+                          className={`sq ${isLight?"light":"dark"} ${isHL?"highlight":""}`}>
+                          {piece ? PIECES[piece] : ""}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div style={{fontWeight:600,fontSize:"1rem",color:"var(--brown)",marginBottom:"1.25rem",lineHeight:1.6}}>{q.q}</div>
         {q.opts.map((opt, i) => {
           let cls = "quiz-option";
