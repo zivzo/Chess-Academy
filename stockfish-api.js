@@ -372,7 +372,7 @@ export async function getStockfishAnalysis(board, side, gameState) {
     const move = allMoves.find(m =>
       m.r === parsedMove.r && m.c === parsedMove.c &&
       m.tr === parsedMove.tr && m.tc === parsedMove.tc
-    ) || parsedMove;
+    ) || allMoves[0];
 
     return {
       move,
