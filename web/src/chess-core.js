@@ -286,8 +286,10 @@ export function generatePseudoLegalMoves(board, side) {
   return moves;
 }
 
-export function getEngineRecommendation(board, side) {
-  const moves = generatePseudoLegalMoves(board, side);
+export function getEngineRecommendation(board, side, gameState) {
+  const moves = gameState
+    ? getAllLegalMoves(board, side, gameState)
+    : generatePseudoLegalMoves(board, side);
   if (moves.length === 0) return null;
 
   let bestMove = moves[0];
@@ -295,7 +297,9 @@ export function getEngineRecommendation(board, side) {
   let bestRawScore = 0;
 
   for (const move of moves) {
-    const nextBoard = applyBoardMove(board, move);
+    const nextBoard = gameState
+      ? applyMoveWithRules(board, move, gameState).board
+      : applyBoardMove(board, move);
     const score = evaluateBoard(nextBoard);
     const perspectiveScore = side === "w" ? score : -score;
     if (perspectiveScore > bestPerspectiveScore) {

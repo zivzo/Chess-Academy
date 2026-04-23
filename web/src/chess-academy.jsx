@@ -622,21 +622,30 @@ function GamePage() {
   const [history, setHistory] = useState([]);
   const [activeTab, setActiveTab] = useState("play");
   const [engineThinking, setEngineThinking] = useState(false);
+  const [gameState, setGameState] = useState(() => createGameState());
+  const [status, setStatus] = useState("playing"); // "playing" | "check" | "checkmate" | "stalemate"
 
-  const recommendation = useMemo(() => getEngineRecommendation(board, turn), [board, turn]);
+  const recommendation = useMemo(() => getEngineRecommendation(board, turn, gameState), [board, turn, gameState]);
 
   useEffect(() => {
     if (turn !== "b") return;
+    if (status === "checkmate" || status === "stalemate") return;
     if (!recommendation) return;
     setEngineThinking(true);
     const timer = setTimeout(() => {
-      setBoard(prev => applyBoardMove(prev, recommendation));
+      const { board: nextBoard, gameState: nextGameState } =
+        applyMoveWithRules(board, recommendation, gameState);
+      const nextStatus = getGameStatus(nextBoard, "w", nextGameState);
+
+      setBoard(nextBoard);
+      setGameState(nextGameState);
       setHistory(prev => [...prev, `Black: ${formatMove(recommendation)}`]);
       setTurn("w");
+      setStatus(nextStatus);
       setEngineThinking(false);
     }, 350);
     return () => clearTimeout(timer);
-  }, [recommendation, turn]);
+  }, [recommendation, turn, board, gameState, status]);
 
   function resetGame() {
     setBoard(START.map(r => [...r]));
@@ -645,16 +654,29 @@ function GamePage() {
     setMovesFromSquare([]);
     setHistory([]);
     setEngineThinking(false);
+    setGameState(createGameState());
+    setStatus("playing");
+  }
+
+  function colorName(color) {
+    return color === "w" ? "White" : "Black";
   }
 
   function onSquareClick(r, c) {
     if (turn !== "w" || engineThinking) return;
+    if (status === "checkmate" || status === "stalemate") return;
 
     const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
     if (selected && chosenMove) {
-      setBoard(prev => applyBoardMove(prev, chosenMove));
+      const { board: nextBoard, gameState: nextGameState } =
+        applyMoveWithRules(board, chosenMove, gameState);
+      const nextStatus = getGameStatus(nextBoard, "b", nextGameState);
+
+      setBoard(nextBoard);
+      setGameState(nextGameState);
       setHistory(prev => [...prev, `White: ${formatMove(chosenMove)}`]);
       setTurn("b");
+      setStatus(nextStatus);
       setSelected(null);
       setMovesFromSquare([]);
       return;
@@ -668,14 +690,28 @@ function GamePage() {
     }
 
     setSelected([r, c]);
-    const allWhiteMoves = generatePseudoLegalMoves(board, "w");
-    setMovesFromSquare(allWhiteMoves.filter(m => m.r === r && m.c === c));
+    setMovesFromSquare(getLegalMovesWithRules(board, r, c, gameState));
   }
 
+  const isGameOver = status === "checkmate" || status === "stalemate";
   const moveDests = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
   const evalText = recommendation
     ? `${recommendation.evaluation > 0 ? "+" : recommendation.evaluation < 0 ? "" : "±"}${recommendation.evaluation.toFixed(1)}`
     : "0.0";
+
+  let turnLabel;
+  if (status === "checkmate") {
+    const winner = turn === "w" ? "b" : "w";
+    turnLabel = `Checkmate! ${colorName(winner)} wins`;
+  } else if (status === "stalemate") {
+    turnLabel = "Stalemate — Draw";
+  } else if (engineThinking) {
+    turnLabel = "Engine thinking...";
+  } else if (status === "check") {
+    turnLabel = `${colorName(turn)} is in check`;
+  } else {
+    turnLabel = `${colorName(turn)} to move`;
+  }
 
   return (
     <div className="fade-in">
@@ -688,7 +724,7 @@ function GamePage() {
       </div>
 
       <div className="game-controls">
-        <span className="turn-pill">{engineThinking ? "Engine thinking..." : turn === "w" ? "White to move" : "Black to move"}</span>
+        <span className="turn-pill">{isGameOver ? "🏁" : status === "check" ? "⚠️" : "⏱"} {turnLabel}</span>
         <button className="btn btn-sm btn-outline" onClick={resetGame}>Reset Game</button>
       </div>
 
