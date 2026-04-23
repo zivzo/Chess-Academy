@@ -690,6 +690,10 @@ function GamePage() {
   const [activeTab, setActiveTab]       = useState("play");
   const [engineRating, setEngineRating] = useState(DEFAULT_ENGINE_RATING);
 
+  // Rules engine state
+  const [gameState, setGameState] = useState(() => createGameState());
+  const [status, setStatus] = useState("playing"); // "playing" | "check" | "checkmate" | "stalemate"
+
   // Analysis state (async — null means "loading or not yet fetched")
   const [analysis, setAnalysis]         = useState(null);
 
@@ -702,6 +706,7 @@ function GamePage() {
   // ── Engine plays as Black (async) ──────────────────────────────────────────
   useEffect(() => {
     if (turn !== "b") return;
+    if (status === "checkmate" || status === "stalemate") return;
 
     let cancelled = false;
     const requestId = ++moveRequestId.current;
@@ -711,14 +716,19 @@ function GamePage() {
       if (cancelled || requestId !== moveRequestId.current) return;
 
       if (move) {
-        setBoard(prev => applyBoardMove(prev, move));
+        const { board: nextBoard, gameState: nextGS } =
+          applyMoveWithRules(board, move, gameState);
+        const nextStatus = getGameStatus(nextBoard, "w", nextGS);
+        setBoard(nextBoard);
+        setGameState(nextGS);
         setHistory(prev => [...prev, `Black: ${formatMove(move)}`]);
+        setStatus(nextStatus);
       }
       setTurn("w");
     });
 
     return () => { cancelled = true; };
-  }, [turn, board, engineRating]);
+  }, [turn, board, engineRating, gameState, status]);
 
   // ── Fetch analysis whenever the position changes ───────────────────────────
   useEffect(() => {
@@ -744,17 +754,30 @@ function GamePage() {
     setMovesFromSquare([]);
     setHistory([]);
     setAnalysis(null);
+    setGameState(createGameState());
+    setStatus("playing");
   }, []);
+
+  function colorName(color) {
+    return color === "w" ? "White" : "Black";
+  }
 
   // ── Square click handler ───────────────────────────────────────────────────
   function onSquareClick(r, c) {
     if (turn !== "w" || engineThinking) return;
+    if (status === "checkmate" || status === "stalemate") return;
 
     const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
     if (selected && chosenMove) {
-      setBoard(prev => applyBoardMove(prev, chosenMove));
+      const { board: nextBoard, gameState: nextGameState } =
+        applyMoveWithRules(board, chosenMove, gameState);
+      const nextStatus = getGameStatus(nextBoard, "b", nextGameState);
+
+      setBoard(nextBoard);
+      setGameState(nextGameState);
       setHistory(prev => [...prev, `White: ${formatMove(chosenMove)}`]);
       setTurn("b");
+      setStatus(nextStatus);
       setSelected(null);
       setMovesFromSquare([]);
       return;
@@ -768,14 +791,28 @@ function GamePage() {
     }
 
     setSelected([r, c]);
-    const allWhiteMoves = generatePseudoLegalMoves(board, "w");
-    setMovesFromSquare(allWhiteMoves.filter(m => m.r === r && m.c === c));
+    setMovesFromSquare(getLegalMovesWithRules(board, r, c, gameState));
   }
 
   // ── Derived values ─────────────────────────────────────────────────────────
+  const isGameOver = status === "checkmate" || status === "stalemate";
   const moveDests = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
   const { label: ratingLabel, css: ratingCss } = strengthLabel(engineRating);
   const evalText = analysis ? formatEval(analysis.evaluation, analysis.mate) : "0.0";
+
+  let turnLabel;
+  if (status === "checkmate") {
+    const winner = turn === "w" ? "b" : "w";
+    turnLabel = `Checkmate! ${colorName(winner)} wins`;
+  } else if (status === "stalemate") {
+    turnLabel = "Stalemate — Draw";
+  } else if (engineThinking) {
+    turnLabel = "Stockfish thinking…";
+  } else if (status === "check") {
+    turnLabel = `${colorName(turn)} is in check`;
+  } else {
+    turnLabel = `${colorName(turn)} to move`;
+  }
 
   return (
     <div className="fade-in">
@@ -810,9 +847,7 @@ function GamePage() {
       </div>
 
       <div className="game-controls">
-        <span className="turn-pill">
-          {engineThinking ? "Stockfish thinking…" : turn === "w" ? "White to move" : "Black to move"}
-        </span>
+        <span className="turn-pill">{isGameOver ? "🏁" : status === "check" ? "⚠️" : "⏱"} {turnLabel}</span>
         <button className="btn btn-sm btn-outline" onClick={resetGame}>Reset Game</button>
       </div>
 
