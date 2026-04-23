@@ -1,7 +1,7 @@
 import Square from './Square.jsx';
 
 export default function Board({ board, legalMovesMap, selectedSquare, lastMove, checkSquare, onSquareClick, onDrop, flipped }) {
-  const rows = flipped ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
+  const rows = flipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
   const cols = flipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
   const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
   const ranks = flipped ? [1,2,3,4,5,6,7,8] : [8,7,6,5,4,3,2,1];
@@ -47,8 +47,14 @@ export default function Board({ board, legalMovesMap, selectedSquare, lastMove, 
                   onDrop={e => {
                     const text = e.dataTransfer.getData('text/plain');
                     if (!text) return;
-                    const from = JSON.parse(text);
-                    onDrop && onDrop(from, { r: ri, c: ci });
+                    try {
+                      const from = JSON.parse(text);
+                      if (typeof from?.r !== 'number' || typeof from?.c !== 'number') return;
+                      if (from.r < 0 || from.r > 7 || from.c < 0 || from.c > 7) return;
+                      onDrop && onDrop(from, { r: ri, c: ci });
+                    } catch {
+                      // Ignore malformed drag data
+                    }
                   }}
                 />
               );

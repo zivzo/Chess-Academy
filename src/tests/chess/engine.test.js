@@ -147,16 +147,19 @@ describe('Chess Engine — en passant', () => {
 
 describe('Chess Engine — checkmate & stalemate', () => {
   it("Scholar's mate is detected as checkmate", () => {
-    // Position after 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6 4.Qxf7#
+    // Position after 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6?? 4.Qxf7#
+    // Key: bQ still at d8 (row 0 col 3), e-pawn moved to e5 (row 1 col 4 empty),
+    //      wQ captured on f7 (row 1 col 5), wQ left d1 (row 7 col 3 empty),
+    //      wB left f1 (row 7 col 5 empty) and sits on c4 (row 4 col 2).
     const board = Array.from({ length: 8 }, () => Array(8).fill(null));
-    board[0] = ['bR', null, 'bB', null, 'bK', 'bB', null, 'bR'];
-    board[1] = ['bP', 'bP', 'bP', 'bP', 'bP', 'wQ', 'bP', 'bP'];
+    board[0] = ['bR', null, 'bB', 'bQ', 'bK', 'bB', null, 'bR'];
+    board[1] = ['bP', 'bP', 'bP', 'bP', null, 'wQ', 'bP', 'bP'];
     board[2] = [null, null, 'bN', null, null, 'bN', null, null];
     board[3] = [null, null, null, null, 'bP', null, null, null];
     board[4] = [null, null, 'wB', null, 'wP', null, null, null];
     board[5] = [null, null, null, null, null, null, null, null];
     board[6] = ['wP', 'wP', 'wP', 'wP', null, 'wP', 'wP', 'wP'];
-    board[7] = ['wR', 'wN', 'wB', 'wQ', 'wK', null, 'wN', 'wR'];
+    board[7] = ['wR', 'wN', 'wB', null, 'wK', null, 'wN', 'wR'];
     const status = getGameStatus(board, 'b', null, DEFAULT_CASTLING);
     expect(status).toBe('checkmate');
   });

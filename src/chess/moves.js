@@ -159,6 +159,7 @@ export function applyMove(board, move) {
 }
 
 export function getLegalMoves(board, r, c, enPassantTarget, castlingRights, turn) {
+  if (!inBounds(r, c)) return [];
   const piece = board[r][c];
   if (!piece || getColor(piece) !== turn) return [];
 
