@@ -17,6 +17,7 @@
 
 import {
   generatePseudoLegalMoves,
+  getAllLegalMoves,
   applyBoardMove,
   evaluateBoard,
 } from "./chess-core.js";
@@ -237,10 +238,13 @@ function applyWeakness(bestMove, allMoves, rating) {
  *
  * @param {(string|null)[][]} board
  * @param {"w"|"b"} side
+ * @param {object} [gameState] - Game state for legal move generation.
  * @returns {{ r:number, c:number, tr:number, tc:number, evaluation:number }|null}
  */
-function localEngineFallback(board, side) {
-  const moves = generatePseudoLegalMoves(board, side);
+function localEngineFallback(board, side, gameState) {
+  const moves = gameState
+    ? getAllLegalMoves(board, side, gameState)
+    : generatePseudoLegalMoves(board, side);
   if (moves.length === 0) return null;
 
   let bestMove = moves[0];
@@ -277,10 +281,13 @@ function localEngineFallback(board, side) {
  * @param {(string|null)[][]} board  - 8×8 board array.
  * @param {"w"|"b"} side            - Side to move.
  * @param {number}  [rating=1500]   - Engine strength (200–3000 Elo).
+ * @param {object}  [gameState]     - Game state for legal move generation.
  * @returns {Promise<{ r:number, c:number, tr:number, tc:number, evaluation:number, source:string }|null>}
  */
-export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATING) {
-  const allMoves = generatePseudoLegalMoves(board, side);
+export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATING, gameState) {
+  const allMoves = gameState
+    ? getAllLegalMoves(board, side, gameState)
+    : generatePseudoLegalMoves(board, side);
   if (allMoves.length === 0) return null;
 
   try {
@@ -300,7 +307,7 @@ export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATI
     return { ...finalMove, evaluation, source: "stockfish" };
   } catch {
     // API unavailable — fall back to local engine.
-    const fallback = localEngineFallback(board, side);
+    const fallback = localEngineFallback(board, side, gameState);
     if (!fallback) return null;
 
     const finalMove = applyWeakness(fallback, allMoves, rating);
@@ -318,10 +325,13 @@ export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATI
  *
  * @param {(string|null)[][]} board - 8×8 board array.
  * @param {"w"|"b"} side           - Side to move.
+ * @param {object}  [gameState]    - Game state for legal move generation.
  * @returns {Promise<{ move:{r,c,tr,tc}, evaluation:number, mate:number|null, source:string }|null>}
  */
-export async function getStockfishAnalysis(board, side) {
-  const allMoves = generatePseudoLegalMoves(board, side);
+export async function getStockfishAnalysis(board, side, gameState) {
+  const allMoves = gameState
+    ? getAllLegalMoves(board, side, gameState)
+    : generatePseudoLegalMoves(board, side);
   if (allMoves.length === 0) return null;
 
   try {
@@ -336,7 +346,7 @@ export async function getStockfishAnalysis(board, side) {
       source: "stockfish",
     };
   } catch {
-    const fallback = localEngineFallback(board, side);
+    const fallback = localEngineFallback(board, side, gameState);
     if (!fallback) return null;
 
     return {
