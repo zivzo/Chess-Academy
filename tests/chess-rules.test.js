@@ -351,3 +351,67 @@ test("black can castle kingside", () => {
   assert.equal(afterCastle[0][6], "bK");
   assert.equal(afterCastle[0][5], "bR");
 });
+
+// ── Scholar's Mate ───────────────────────────────────────────────────────
+// Reproduces the bug from the issue: after 1.e4 Na6 2.Bc4 f5 3.Qh5+,
+// the queen checks the king through the open h5–f7–e8 diagonal.
+// The engine must not be allowed to play an illegal move (like Na6–c5)
+// that ignores the check, which previously led to the king being captured.
+test("Scholar's Mate: Qh5 gives check when f7 pawn has moved, black must respond", () => {
+  let board = createInitialBoard();
+  let gs = createGameState();
+
+  // 1. e4
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 6, c: 4, tr: 4, tc: 4 }, gs));
+  // 1... Na6
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 0, c: 1, tr: 2, tc: 0 }, gs));
+  // 2. Bc4
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 7, c: 5, tr: 4, tc: 2 }, gs));
+  // 2... f5
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 1, c: 5, tr: 3, tc: 5 }, gs));
+  // 3. Qh5
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 7, c: 3, tr: 3, tc: 7 }, gs));
+
+  // Black is now in check (queen on h5 attacks king on e8 via open diagonal)
+  assert.ok(isInCheck(board, "b"), "Black king should be in check after Qh5");
+  assert.equal(getGameStatus(board, "b", gs), "check");
+
+  // The knight on a6 must NOT be able to move to c5 (doesn't address check)
+  const knightMoves = getLegalMovesWithRules(board, 2, 0, gs);
+  const nc5 = knightMoves.find(m => m.tr === 4 && m.tc === 2);
+  assert.ok(!nc5, "Na6-c5 should be illegal because black is in check");
+
+  // All legal moves for black must resolve the check
+  const allBlackMoves = getAllLegalMoves(board, "b", gs);
+  assert.ok(allBlackMoves.length > 0, "Black should have at least one legal move");
+  for (const move of allBlackMoves) {
+    const { board: afterMove } = applyMoveWithRules(board, move, gs);
+    assert.ok(!isInCheck(afterMove, "b"),
+      `Move from (${move.r},${move.c}) to (${move.tr},${move.tc}) should resolve the check`);
+  }
+});
+
+test("Scholar's Mate: classic Qxf7# is checkmate", () => {
+  let board = createInitialBoard();
+  let gs = createGameState();
+
+  // 1. e4
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 6, c: 4, tr: 4, tc: 4 }, gs));
+  // 1... e5
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 1, c: 4, tr: 3, tc: 4 }, gs));
+  // 2. Bc4
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 7, c: 5, tr: 4, tc: 2 }, gs));
+  // 2... Nc6
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 0, c: 1, tr: 2, tc: 2 }, gs));
+  // 3. Qh5
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 7, c: 3, tr: 3, tc: 7 }, gs));
+  // 3... Nf6 (a blunder)
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 0, c: 6, tr: 2, tc: 5 }, gs));
+  // 4. Qxf7# (queen captures f7 pawn, protected by bishop on c4)
+  ({ board, gameState: gs } = applyMoveWithRules(board, { r: 3, c: 7, tr: 1, tc: 5 }, gs));
+
+  // Black is in checkmate
+  assert.equal(getGameStatus(board, "b", gs), "checkmate");
+  assert.ok(isInCheck(board, "b"), "Black king should be in check");
+  assert.equal(getAllLegalMoves(board, "b", gs).length, 0, "Black should have no legal moves");
+});
