@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PIECES,
   START,
@@ -9,7 +9,6 @@ import {
   getLegalMoves,
   applyLocalMove,
   generatePseudoLegalMoves,
-  getEngineRecommendation,
   applyBoardMove,
   formatMove,
   createGameState,
@@ -17,6 +16,13 @@ import {
   applyMoveWithRules,
   getGameStatus,
 } from "./chess-core.js";
+import {
+  getStockfishMove,
+  getStockfishAnalysis,
+  DEFAULT_ENGINE_RATING,
+  MIN_ENGINE_RATING,
+  MAX_ENGINE_RATING,
+} from "./stockfish-api.js";
 
 // ── Palette & fonts injected via style tag ──────────────────────────────────
 const GlobalStyles = () => (
@@ -259,6 +265,34 @@ const GlobalStyles = () => (
     }
     .engine-rec h4 { font-size: 0.85rem; color: var(--brown); margin-bottom: 0.35rem; }
     .engine-rec p { font-size: 0.82rem; color: #4A3F35; line-height: 1.6; }
+    .engine-source { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; }
+
+    /* ── Engine strength selector ── */
+    .strength-selector {
+      background: white; border: 1px solid var(--border); border-radius: 10px;
+      padding: 0.9rem 1rem; margin-bottom: 0.85rem;
+    }
+    .strength-selector label {
+      display: block; font-size: 0.82rem; font-weight: 500;
+      color: var(--brown); margin-bottom: 0.5rem;
+    }
+    .strength-selector input[type="range"] {
+      width: 100%; accent-color: var(--gold); cursor: pointer;
+    }
+    .strength-labels {
+      display: flex; justify-content: space-between;
+      font-size: 0.7rem; color: var(--muted); margin-top: 0.25rem;
+    }
+    .strength-badge {
+      display: inline-block; font-size: 0.72rem; font-weight: 600;
+      padding: 0.15rem 0.5rem; border-radius: 999px;
+      margin-left: 0.4rem;
+    }
+    .strength-badge.beginner   { background: #E8F5E9; color: #2E7D32; }
+    .strength-badge.casual     { background: #E3F2FD; color: #1565C0; }
+    .strength-badge.club       { background: #FFF3E0; color: #E65100; }
+    .strength-badge.advanced   { background: #F3E5F5; color: #6A1B9A; }
+    .strength-badge.master     { background: #FCE4EC; color: #AD1457; }
 
     /* ── Concept pills ── */
     .concept-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.85rem; }
@@ -613,55 +647,122 @@ function LocalGamePage() {
   );
 }
 
-// ── Play vs engine + analysis ────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Returns a human-readable label for a given engine rating.
+ * @param {number} rating - Elo rating (200–3000).
+ * @returns {{ label: string, css: string }}
+ */
+function strengthLabel(rating) {
+  if (rating < 600)  return { label: "Beginner",   css: "beginner" };
+  if (rating < 1000) return { label: "Casual",     css: "casual" };
+  if (rating < 1600) return { label: "Club",       css: "club" };
+  if (rating < 2200) return { label: "Advanced",   css: "advanced" };
+  return                     { label: "Master",     css: "master" };
+}
+
+/**
+ * Formats a numeric evaluation into a display string like "+1.5" or "M3".
+ * @param {number|null} evaluation - Evaluation in pawns.
+ * @param {number|null} mate       - Mate-in-N (null when no forced mate).
+ * @returns {string}
+ */
+function formatEval(evaluation, mate) {
+  if (mate !== null && mate !== undefined) {
+    return mate > 0 ? `M${mate}` : `-M${Math.abs(mate)}`;
+  }
+  if (evaluation === null || evaluation === undefined) return "0.0";
+  const sign = evaluation > 0 ? "+" : evaluation < 0 ? "" : "±";
+  return `${sign}${evaluation.toFixed(1)}`;
+}
+
+// ── Play vs Stockfish + analysis ─────────────────────────────────────────────
 function GamePage() {
-  const [board, setBoard] = useState(() => START.map(r => [...r]));
-  const [turn, setTurn] = useState("w");
-  const [selected, setSelected] = useState(null);
+  // Board & game state
+  const [board, setBoard]               = useState(() => START.map(r => [...r]));
+  const [turn, setTurn]                 = useState("w");
+  const [selected, setSelected]         = useState(null);
   const [movesFromSquare, setMovesFromSquare] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [activeTab, setActiveTab] = useState("play");
-  const [engineThinking, setEngineThinking] = useState(false);
+  const [history, setHistory]           = useState([]);
+
+  // UI state
+  const [activeTab, setActiveTab]       = useState("play");
+  const [engineRating, setEngineRating] = useState(DEFAULT_ENGINE_RATING);
+
+  // Rules engine state
   const [gameState, setGameState] = useState(() => createGameState());
   const [status, setStatus] = useState("playing"); // "playing" | "check" | "checkmate" | "stalemate"
 
-  const recommendation = useMemo(() => getEngineRecommendation(board, turn, gameState), [board, turn, gameState]);
+  // Analysis state (async — null means "loading or not yet fetched")
+  const [analysis, setAnalysis]         = useState(null);
 
+  // Engine is thinking whenever it is Black's turn.
+  const engineThinking = turn === "b";
+
+  // Ref to track the latest request and avoid stale async responses.
+  const moveRequestId = useRef(0);
+
+  // ── Engine plays as Black (async) ──────────────────────────────────────────
   useEffect(() => {
     if (turn !== "b") return;
     if (status === "checkmate" || status === "stalemate") return;
-    if (!recommendation) return;
-    setEngineThinking(true);
-    const timer = setTimeout(() => {
-      const { board: nextBoard, gameState: nextGameState } =
-        applyMoveWithRules(board, recommendation, gameState);
-      const nextStatus = getGameStatus(nextBoard, "w", nextGameState);
 
-      setBoard(nextBoard);
-      setGameState(nextGameState);
-      setHistory(prev => [...prev, `Black: ${formatMove(recommendation)}`]);
+    let cancelled = false;
+    const requestId = ++moveRequestId.current;
+
+    getStockfishMove(board, "b", engineRating).then((move) => {
+      // Ignore if a newer request was started or the effect was cleaned up.
+      if (cancelled || requestId !== moveRequestId.current) return;
+
+      if (move) {
+        const { board: nextBoard, gameState: nextGS } =
+          applyMoveWithRules(board, move, gameState);
+        const nextStatus = getGameStatus(nextBoard, "w", nextGS);
+        setBoard(nextBoard);
+        setGameState(nextGS);
+        setHistory(prev => [...prev, `Black: ${formatMove(move)}`]);
+        setStatus(nextStatus);
+      }
       setTurn("w");
-      setStatus(nextStatus);
-      setEngineThinking(false);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [recommendation, turn, board, gameState, status]);
+    });
 
-  function resetGame() {
+    return () => { cancelled = true; };
+  }, [turn, board, engineRating, gameState, status]);
+
+  // ── Fetch analysis whenever the position changes ───────────────────────────
+  useEffect(() => {
+    if (activeTab !== "analysis") return;
+
+    let cancelled = false;
+
+    getStockfishAnalysis(board, turn).then((result) => {
+      if (!cancelled) {
+        setAnalysis(result);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [board, turn, activeTab]);
+
+  // ── Reset ──────────────────────────────────────────────────────────────────
+  const resetGame = useCallback(() => {
+    moveRequestId.current++;          // Cancel any in-flight API call.
     setBoard(START.map(r => [...r]));
     setTurn("w");
     setSelected(null);
     setMovesFromSquare([]);
     setHistory([]);
-    setEngineThinking(false);
+    setAnalysis(null);
     setGameState(createGameState());
     setStatus("playing");
-  }
+  }, []);
 
   function colorName(color) {
     return color === "w" ? "White" : "Black";
   }
 
+  // ── Square click handler ───────────────────────────────────────────────────
   function onSquareClick(r, c) {
     if (turn !== "w" || engineThinking) return;
     if (status === "checkmate" || status === "stalemate") return;
@@ -693,11 +794,11 @@ function GamePage() {
     setMovesFromSquare(getLegalMovesWithRules(board, r, c, gameState));
   }
 
+  // ── Derived values ─────────────────────────────────────────────────────────
   const isGameOver = status === "checkmate" || status === "stalemate";
   const moveDests = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
-  const evalText = recommendation
-    ? `${recommendation.evaluation > 0 ? "+" : recommendation.evaluation < 0 ? "" : "±"}${recommendation.evaluation.toFixed(1)}`
-    : "0.0";
+  const { label: ratingLabel, css: ratingCss } = strengthLabel(engineRating);
+  const evalText = analysis ? formatEval(analysis.evaluation, analysis.mate) : "0.0";
 
   let turnLabel;
   if (status === "checkmate") {
@@ -706,7 +807,7 @@ function GamePage() {
   } else if (status === "stalemate") {
     turnLabel = "Stalemate — Draw";
   } else if (engineThinking) {
-    turnLabel = "Engine thinking...";
+    turnLabel = "Stockfish thinking…";
   } else if (status === "check") {
     turnLabel = `${colorName(turn)} is in check`;
   } else {
@@ -715,12 +816,34 @@ function GamePage() {
 
   return (
     <div className="fade-in">
-      <div className="page-title">Play vs Engine</div>
-      <div className="page-subtitle">Play as White against a built-in engine, then switch to Analysis for recommendations.</div>
+      <div className="page-title">Play vs Stockfish</div>
+      <div className="page-subtitle">
+        Play as White against the Stockfish engine. Adjust strength and switch to Analysis for recommendations.
+      </div>
 
       <div className="tab-row">
         <button className={`mini-tab ${activeTab === "play" ? "active" : ""}`} onClick={() => setActiveTab("play")}>♟ Game</button>
         <button className={`mini-tab ${activeTab === "analysis" ? "active" : ""}`} onClick={() => setActiveTab("analysis")}>🔍 Analysis</button>
+      </div>
+
+      {/* ── Engine strength selector ── */}
+      <div className="strength-selector">
+        <label>
+          Engine Strength: <strong>{engineRating}</strong> Elo
+          <span className={`strength-badge ${ratingCss}`}>{ratingLabel}</span>
+        </label>
+        <input
+          type="range"
+          min={MIN_ENGINE_RATING}
+          max={MAX_ENGINE_RATING}
+          step={100}
+          value={engineRating}
+          onChange={(e) => setEngineRating(Number(e.target.value))}
+        />
+        <div className="strength-labels">
+          <span>Beginner ({MIN_ENGINE_RATING})</span>
+          <span>Master ({MAX_ENGINE_RATING})</span>
+        </div>
       </div>
 
       <div className="game-controls">
@@ -762,14 +885,23 @@ function GamePage() {
           {activeTab === "analysis" && (
             <>
               <div className="engine-rec">
-                <h4>Engine Recommendation</h4>
-                <p>
-                  {recommendation
-                    ? `${turn === "w" ? "White" : "Black"} best move: ${formatMove(recommendation)}`
-                    : "No legal moves available from this position."}
-                  <br />
-                  Evaluation (White perspective): <strong>{evalText}</strong>
-                </p>
+                <h4>Stockfish Recommendation</h4>
+                {!analysis ? (
+                  <p>Analyzing position…</p>
+                ) : (
+                  <p>
+                    {analysis?.move
+                      ? `${turn === "w" ? "White" : "Black"} best move: ${formatMove(analysis.move)}`
+                      : "No legal moves available from this position."}
+                    <br />
+                    Evaluation (White perspective): <strong>{evalText}</strong>
+                  </p>
+                )}
+                {analysis?.source && (
+                  <div className="engine-source">
+                    Source: {analysis.source === "stockfish" ? "Stockfish API" : "Local engine (API unavailable)"}
+                  </div>
+                )}
               </div>
               <div className="card" style={{padding:"1rem"}}>
                 <div className="card-title" style={{fontSize:"0.92rem"}}>How to use this tab</div>
@@ -991,7 +1123,7 @@ export default function ChessAcademy() {
               <div className="sidebar-label">Games</div>
               <div className={`sidebar-item ${page==="games"?"active":""}`}
                 onClick={() => { setPage("games"); setSelectedOpening(null); }}>
-                <span className="icon">♟</span>Play vs Engine
+                <span className="icon">♟</span>Play vs Stockfish
               </div>
             </div>
 
