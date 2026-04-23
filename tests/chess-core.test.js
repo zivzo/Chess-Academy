@@ -17,6 +17,15 @@ import {
   formatMove,
 } from "../chess-core.js";
 
+import {
+  boardToFEN,
+  parseUCIMove,
+  moveToUCI,
+  ratingToDepth,
+  MIN_ENGINE_RATING,
+  MAX_ENGINE_RATING,
+} from "../stockfish-api.js";
+
 test("applyMoves returns an untouched copy of the initial board for empty input", () => {
   const board = applyMoves([]);
   assert.deepEqual(board, START);
@@ -142,5 +151,71 @@ test("getEngineRecommendation prioritizes winning material", () => {
   assert.equal(formatMove(rec), "d4→h4");
   const next = applyBoardMove(board, rec);
   assert.ok(evaluateBoard(next) > evaluateBoard(board));
+});
+
+// ── Stockfish API module tests ───────────────────────────────────────────────
+
+test("boardToFEN produces correct FEN for the starting position", () => {
+  const fen = boardToFEN(START, "w");
+  assert.equal(fen, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+});
+
+test("boardToFEN handles a position after 1.e4", () => {
+  const board = applyMoves([{ r: 6, c: 4, tr: 4, tc: 4 }]);
+  const fen = boardToFEN(board, "b");
+  assert.equal(fen, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+});
+
+test("boardToFEN shows no castling rights when kings are not on starting squares", () => {
+  const board = Array.from({ length: 8 }, () => Array(8).fill(null));
+  board[6][4] = "wK"; // King moved off e1
+  board[0][4] = "bK";
+  const fen = boardToFEN(board, "w");
+  assert.ok(fen.includes(" - "), "Should contain '-' for no castling");
+  // Only black should have partial rights
+  assert.match(fen, /\s[kq-]+\s/);
+});
+
+test("parseUCIMove converts standard UCI moves correctly", () => {
+  assert.deepEqual(parseUCIMove("e2e4"), { r: 6, c: 4, tr: 4, tc: 4 });
+  assert.deepEqual(parseUCIMove("a7a8"), { r: 1, c: 0, tr: 0, tc: 0 });
+  assert.deepEqual(parseUCIMove("h1h8"), { r: 7, c: 7, tr: 0, tc: 7 });
+});
+
+test("parseUCIMove handles promotion suffix", () => {
+  const move = parseUCIMove("e7e8q");
+  assert.deepEqual(move, { r: 1, c: 4, tr: 0, tc: 4, promotion: "q" });
+});
+
+test("moveToUCI converts internal moves to UCI strings", () => {
+  assert.equal(moveToUCI({ r: 6, c: 4, tr: 4, tc: 4 }), "e2e4");
+  assert.equal(moveToUCI({ r: 0, c: 4, tr: 0, tc: 6 }), "e8g8");
+});
+
+test("parseUCIMove and moveToUCI are inverse operations", () => {
+  const uciMoves = ["e2e4", "d7d5", "g1f3", "b8c6", "a1a8"];
+  for (const uci of uciMoves) {
+    const parsed = parseUCIMove(uci);
+    assert.equal(moveToUCI(parsed), uci);
+  }
+});
+
+test("ratingToDepth maps boundary values correctly", () => {
+  assert.equal(ratingToDepth(MIN_ENGINE_RATING), 1);   // 200 → depth 1
+  assert.equal(ratingToDepth(MAX_ENGINE_RATING), 15);   // 3000 → depth 15
+});
+
+test("ratingToDepth produces increasing depths for increasing ratings", () => {
+  let prevDepth = 0;
+  for (let rating = 200; rating <= 3000; rating += 200) {
+    const depth = ratingToDepth(rating);
+    assert.ok(depth >= prevDepth, `Depth should not decrease: rating ${rating} → depth ${depth}`);
+    prevDepth = depth;
+  }
+});
+
+test("ratingToDepth clamps values outside the valid range", () => {
+  assert.equal(ratingToDepth(0), 1);      // Below minimum
+  assert.equal(ratingToDepth(5000), 15);   // Above maximum
 });
 
