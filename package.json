@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:ui": "vitest --ui",
-    "test:core": "node --test"
+    "test:core": "node --test tests/"
   },
   "dependencies": {
     "react": "^18.2.0",
