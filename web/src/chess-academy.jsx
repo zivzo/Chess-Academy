@@ -279,6 +279,12 @@ const GlobalStyles = () => (
     .strength-selector input[type="range"] {
       width: 100%; accent-color: var(--gold); cursor: pointer;
     }
+    .strength-selector input[type="range"]:disabled {
+      cursor: not-allowed; opacity: 0.55;
+    }
+    .strength-locked-hint {
+      font-size: 0.7rem; color: var(--muted); margin-top: 0.4rem; font-style: italic;
+    }
     .strength-labels {
       display: flex; justify-content: space-between;
       font-size: 0.7rem; color: var(--muted); margin-top: 0.25rem;
@@ -811,6 +817,10 @@ function GamePage() {
 
   // ── Derived values ─────────────────────────────────────────────────────────
   const isGameOver = status === "checkmate" || status === "stalemate";
+  // Lock the engine strength as soon as a move has been played so changing it
+  // mid-game can't interfere with the engine's in-flight calculation. It
+  // becomes editable again after `resetGame` clears the history.
+  const isStrengthLocked = history.length > 0 && !isGameOver;
   const moveDests = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
   const { label: ratingLabel, css: ratingCss } = strengthLabel(engineRating);
   const evalText = analysis ? formatEval(analysis.evaluation, analysis.mate) : "0.0";
@@ -842,6 +852,8 @@ function GamePage() {
       </div>
 
       {/* ── Engine strength selector ── */}
+      {/* Strength is locked once the game has started so changing it mid-game
+          cannot disturb the engine's in-flight move calculation. It unlocks on Reset. */}
       <div className="strength-selector">
         <label>
           Engine Strength: <strong>{engineRating}</strong> Elo
@@ -853,12 +865,18 @@ function GamePage() {
           max={MAX_ENGINE_RATING}
           step={100}
           value={engineRating}
+          disabled={isStrengthLocked}
           onChange={(e) => setEngineRating(Number(e.target.value))}
         />
         <div className="strength-labels">
           <span>Beginner ({MIN_ENGINE_RATING})</span>
           <span>Master ({MAX_ENGINE_RATING})</span>
         </div>
+        {isStrengthLocked && (
+          <div className="strength-locked-hint">
+            🔒 Engine strength is locked during the game. Reset to change it.
+          </div>
+        )}
       </div>
 
       <div className="game-controls">
