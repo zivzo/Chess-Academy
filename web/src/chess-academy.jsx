@@ -542,6 +542,7 @@ function LocalGamePage() {
   const [status, setStatus] = useState("playing"); // "playing" | "check" | "checkmate" | "stalemate"
   const [lastMove, setLastMove] = useState(null);
   const [gameState, setGameState] = useState(() => createGameState());
+  const [historyStack, setHistoryStack] = useState([]);
 
   function colorName(color) {
     return color === "w" ? "White" : "Black";
@@ -555,6 +556,22 @@ function LocalGamePage() {
     setStatus("playing");
     setLastMove(null);
     setGameState(createGameState());
+    setHistoryStack([]);
+  }
+
+  function undoMove() {
+    setHistoryStack((prevStack) => {
+      if (prevStack.length === 0) return prevStack;
+      const prev = prevStack[prevStack.length - 1];
+      setBoard(prev.board);
+      setTurn(prev.turn);
+      setGameState(prev.gameState);
+      setStatus(prev.status);
+      setLastMove(prev.lastMove);
+      setSelected(null);
+      setLegalMoves([]);
+      return prevStack.slice(0, -1);
+    });
   }
 
   function onSquareClick(r, c) {
@@ -565,11 +582,13 @@ function LocalGamePage() {
     const selectedMove = legalMoves.find((m) => m.tr === r && m.tc === c);
 
     if (selected && selectedMove) {
+      const snapshot = { board, turn, gameState, status, lastMove };
       const { board: nextBoard, gameState: nextGameState } =
         applyMoveWithRules(board, selectedMove, gameState);
       const nextTurn = turn === "w" ? "b" : "w";
       const nextStatus = getGameStatus(nextBoard, nextTurn, nextGameState);
 
+      setHistoryStack((prev) => [...prev, snapshot]);
       setBoard(nextBoard);
       setGameState(nextGameState);
       setLastMove([{ r: selectedMove.r, c: selectedMove.c }, { r: selectedMove.tr, c: selectedMove.tc }]);
@@ -612,6 +631,7 @@ function LocalGamePage() {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
           <span className="status-pill">{isGameOver ? "🏁" : status === "check" ? "⚠️" : "⏱"} {turnLabel}</span>
+          <button className="btn btn-outline btn-sm" onClick={undoMove} disabled={historyStack.length === 0}>↶ Undo</button>
           <button className="btn btn-outline btn-sm" onClick={reset}>Reset</button>
         </div>
       </div>
@@ -715,6 +735,9 @@ function GamePage() {
   const [gameState, setGameState] = useState(() => createGameState());
   const [status, setStatus] = useState("playing"); // "playing" | "check" | "checkmate" | "stalemate"
 
+  // Snapshots for undo (each snapshot is the state *before* a move).
+  const [historyStack, setHistoryStack] = useState([]);
+
   // Analysis state (async — null means "loading or not yet fetched")
   const [analysis, setAnalysis]         = useState(null);
 
@@ -777,6 +800,31 @@ function GamePage() {
     setAnalysis(null);
     setGameState(createGameState());
     setStatus("playing");
+    setHistoryStack([]);
+  }, []);
+
+  // ── Undo ───────────────────────────────────────────────────────────────────
+  // Step back to the most recent White-to-move position so the human can
+  // replay. Snapshots are only pushed before the human's move (never before
+  // the engine's reply), so popping one always lands on a White-to-move state
+  // — automatically rolling back the engine's reply along with it.
+  const undoMove = useCallback(() => {
+    setHistoryStack(prevStack => {
+      if (prevStack.length === 0) return prevStack;
+      const stack = prevStack.slice();
+      const snap = stack.pop();
+      moveRequestId.current++;        // Cancel any in-flight engine API call.
+
+      setBoard(snap.board);
+      setTurn(snap.turn);
+      setGameState(snap.gameState);
+      setStatus(snap.status);
+      setHistory(snap.history);
+      setSelected(null);
+      setMovesFromSquare([]);
+      setAnalysis(null);
+      return stack;
+    });
   }, []);
 
   function colorName(color) {
@@ -790,10 +838,12 @@ function GamePage() {
 
     const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
     if (selected && chosenMove) {
+      const snapshot = { board, turn, gameState, status, history };
       const { board: nextBoard, gameState: nextGameState } =
         applyMoveWithRules(board, chosenMove, gameState);
       const nextStatus = getGameStatus(nextBoard, "b", nextGameState);
 
+      setHistoryStack(prev => [...prev, snapshot]);
       setBoard(nextBoard);
       setGameState(nextGameState);
       setHistory(prev => [...prev, `White: ${formatMove(chosenMove)}`]);
@@ -881,6 +931,11 @@ function GamePage() {
 
       <div className="game-controls">
         <span className="turn-pill">{isGameOver ? "🏁" : status === "check" ? "⚠️" : "⏱"} {turnLabel}</span>
+        <button
+          className="btn btn-sm btn-outline"
+          onClick={undoMove}
+          disabled={historyStack.length === 0}
+        >↶ Undo</button>
         <button className="btn btn-sm btn-outline" onClick={resetGame}>Reset Game</button>
       </div>
 
