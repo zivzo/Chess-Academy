@@ -464,7 +464,23 @@ function OpeningsPage({ onSelect }) {
 // ── Interactive board viewer ─────────────────────────────────────────────────
 function BoardViewer({ opening, onBack }) {
   const [step, setStep] = useState(0);
-  const pos = opening.positions[step];
+  const [variantId, setVariantId] = useState(null);
+  const variations = opening.variations ?? [];
+  const activeVariation = variantId
+    ? variations.find((v) => v.id === variantId)
+    : null;
+  const line = activeVariation ?? opening;
+  const lineLabel = activeVariation ? activeVariation.name : "Main Line";
+  // Reset the move pointer when the user picks a different opening or
+  // variation. Adjusting state during render (the React-recommended pattern)
+  // avoids the "set-state-in-effect" anti-pattern.
+  const lineKey = `${opening.id}|${variantId ?? ""}`;
+  const [prevLineKey, setPrevLineKey] = useState(lineKey);
+  if (prevLineKey !== lineKey) {
+    setPrevLineKey(lineKey);
+    setStep(0);
+  }
+  const pos = line.positions[step] ?? line.positions[0];
 
   return (
     <div className="fade-in">
@@ -472,7 +488,9 @@ function BoardViewer({ opening, onBack }) {
         <button className="btn btn-outline btn-sm" onClick={onBack}>← Back</button>
         <div>
           <div className="page-title" style={{marginBottom:0}}>{opening.name}</div>
-          <div className="page-subtitle" style={{marginBottom:0}}>Move {step} of {opening.positions.length - 1}</div>
+          <div className="page-subtitle" style={{marginBottom:0}}>
+            <strong>{lineLabel}</strong> — Move {step} of {line.positions.length - 1}
+          </div>
         </div>
       </div>
 
@@ -503,8 +521,8 @@ function BoardViewer({ opening, onBack }) {
           <div className="board-nav">
             <button className="nav-arrow" disabled={step===0} onClick={() => setStep(0)}>⟪</button>
             <button className="nav-arrow" disabled={step===0} onClick={() => setStep(s => s-1)}>‹</button>
-            <button className="nav-arrow" disabled={step===opening.positions.length-1} onClick={() => setStep(s => s+1)}>›</button>
-            <button className="nav-arrow" disabled={step===opening.positions.length-1} onClick={() => setStep(opening.positions.length-1)}>⟫</button>
+            <button className="nav-arrow" disabled={step===line.positions.length-1} onClick={() => setStep(s => s+1)}>›</button>
+            <button className="nav-arrow" disabled={step===line.positions.length-1} onClick={() => setStep(line.positions.length-1)}>⟫</button>
           </div>
         </div>
 
@@ -512,7 +530,7 @@ function BoardViewer({ opening, onBack }) {
           <div className="move-list-title">Moves</div>
           <div className="move-list">
             <div className="move-chip active" onClick={() => setStep(0)} style={step===0?{}:{opacity:0.5}}>Start</div>
-            {opening.moves.map((m, i) => (
+            {line.moves.map((m, i) => (
               <div key={i} style={{display:"flex",alignItems:"center",gap:"3px"}}>
                 {i % 2 === 0 && <span className="move-number">{Math.floor(i/2)+1}.</span>}
                 <div className={`move-chip ${step===i+1?"active":""}`} onClick={() => setStep(i+1)}>{m}</div>
@@ -521,6 +539,36 @@ function BoardViewer({ opening, onBack }) {
           </div>
 
           <div className="annotation">{pos.annotation}</div>
+
+          {variations.length > 0 && (
+            <div style={{marginTop:"1.25rem"}}>
+              <div className="card-title" style={{fontSize:"0.88rem",marginBottom:"0.5rem"}}>
+                🌿 Variations <span style={{fontWeight:400,color:"var(--muted)",fontSize:"0.78rem"}}>(theory through move 10)</span>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.6rem"}}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${variantId===null?"":"btn-outline"}`}
+                  onClick={() => setVariantId(null)}>
+                  Main Line
+                </button>
+                {variations.map(v => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    className={`btn btn-sm ${variantId===v.id?"":"btn-outline"}`}
+                    onClick={() => setVariantId(v.id)}>
+                    {v.name}
+                  </button>
+                ))}
+              </div>
+              {activeVariation && (
+                <div style={{fontSize:"0.82rem",color:"#4A3F35",lineHeight:"1.55",background:"#FFF8EE",border:"1px solid #F0E2C4",borderRadius:"8px",padding:"0.55rem 0.75rem"}}>
+                  {activeVariation.desc}
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{marginTop:"1.25rem"}}>
             <div className="card-title" style={{fontSize:"0.88rem",marginBottom:"0.5rem"}}>💡 Key Ideas</div>
