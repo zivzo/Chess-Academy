@@ -181,35 +181,49 @@ const GlobalStyles = () => (
     .board-outer { flex-shrink: 0; }
     .board-labels-row { display: flex; align-items: center; }
     .board-files { display: flex; padding-left: 22px; }
-    .board-file-label { width: 60px; text-align: center; font-size: 0.7rem; color: var(--muted); font-weight: 500; }
-    .board-rank-label { width: 22px; text-align: center; font-size: 0.7rem; color: var(--muted); font-weight: 500; line-height: 60px; }
+    .board-file-label { width: 72px; text-align: center; font-size: 0.7rem; color: var(--muted); font-weight: 500; }
+    .board-rank-label { width: 22px; text-align: center; font-size: 0.7rem; color: var(--muted); font-weight: 500; line-height: 72px; }
     .board {
-      display: grid; grid-template-columns: repeat(8, 60px); grid-template-rows: repeat(8, 60px);
-      border: 2px solid var(--brown); border-radius: 4px; overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      display: grid; grid-template-columns: repeat(8, 72px); grid-template-rows: repeat(8, 72px);
+      border: 3px solid var(--brown); border-radius: 6px; overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.12);
     }
     .sq {
-      width: 60px; height: 60px;
+      width: 72px; height: 72px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 2.2rem; cursor: pointer; position: relative;
-      transition: background 0.12s;
+      font-size: 2.6rem; cursor: default; position: relative;
+      transition: filter 0.1s;
       user-select: none;
     }
     .sq.light { background: var(--sq-light); }
     .sq.dark  { background: var(--sq-dark); }
     .sq.highlight { background: var(--sq-hl) !important; }
     .sq.moved { background: var(--sq-move) !important; }
-    .sq.selected { outline: 3px solid rgba(56, 80, 200, 0.8); outline-offset: -3px; }
-    .sq.legal::after {
+    .sq.selected { box-shadow: inset 0 0 0 4px rgba(56, 100, 210, 0.85); }
+    .sq.in-check { background: rgba(200, 30, 30, 0.55) !important; }
+    .sq.legal-empty::after {
       content: "";
-      width: 16px;
-      height: 16px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
-      background: rgba(30, 120, 40, 0.65);
+      background: rgba(0, 0, 0, 0.18);
       position: absolute;
+      pointer-events: none;
     }
+    .sq.legal-capture::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      border: 6px solid rgba(0, 0, 0, 0.2);
+      background: transparent;
+      pointer-events: none;
+    }
+    .sq.dragging { opacity: 0.35; }
+    .sq.piece-grabbable { cursor: grab; }
+    .sq.piece-grabbable:active { cursor: grabbing; }
     .sq.selectable { cursor: pointer; }
-    .sq:hover { filter: brightness(1.07); }
+    .sq:hover { filter: brightness(1.06); }
 
     /* ── Move list ── */
     .move-list-wrap { flex: 1; min-width: 200px; }
@@ -591,6 +605,8 @@ function LocalGamePage() {
   const [lastMove, setLastMove] = useState(null);
   const [gameState, setGameState] = useState(() => createGameState());
   const [historyStack, setHistoryStack] = useState([]);
+  const [draggingSquare, setDraggingSquare] = useState(null);
+  const dragValidDrop = useRef(false);
 
   function colorName(color) {
     return color === "w" ? "White" : "Black";
@@ -605,6 +621,7 @@ function LocalGamePage() {
     setLastMove(null);
     setGameState(createGameState());
     setHistoryStack([]);
+    setDraggingSquare(null);
   }
 
   function undoMove() {
@@ -657,6 +674,46 @@ function LocalGamePage() {
     setLegalMoves([]);
   }
 
+  function onDragStart(e, r, c) {
+    if (status === "checkmate" || status === "stalemate") { e.preventDefault(); return; }
+    const piece = board[r][c];
+    if (!piece || piece[0] !== turn) { e.preventDefault(); return; }
+    const ghost = document.createElement("div");
+    ghost.textContent = PIECES[piece];
+    ghost.style.cssText = "position:fixed;top:-200px;font-size:3.2rem;pointer-events:none;";
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 36, 36);
+    e.dataTransfer.effectAllowed = "move";
+    setTimeout(() => ghost.remove(), 0);
+    setDraggingSquare({ r, c });
+    setSelected({ r, c });
+    setLegalMoves(getLegalMovesWithRules(board, r, c, gameState));
+  }
+
+  function onDragOver(e, r, c) {
+    const isLegalTarget = legalMoves.some((m) => m.tr === r && m.tc === c);
+    if (isLegalTarget) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+    }
+  }
+
+  function onDrop(e, r, c) {
+    e.preventDefault();
+    dragValidDrop.current = true;
+    onSquareClick(r, c);
+    setDraggingSquare(null);
+  }
+
+  function onDragEnd() {
+    if (!dragValidDrop.current) {
+      setSelected(null);
+      setLegalMoves([]);
+    }
+    dragValidDrop.current = false;
+    setDraggingSquare(null);
+  }
+
   const isGameOver = status === "checkmate" || status === "stalemate";
   const winner = status === "checkmate" ? (turn === "w" ? "b" : "w") : null;
   let turnLabel;
@@ -669,6 +726,12 @@ function LocalGamePage() {
   } else {
     turnLabel = `${colorName(turn)} to move`;
   }
+
+  const kingInCheckPos = (() => {
+    if (status !== "check" && status !== "checkmate") return null;
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (board[r][c] === `${turn}K`) return [r, c];
+    return null;
+  })();
 
   return (
     <div className="fade-in">
@@ -698,20 +761,37 @@ function LocalGamePage() {
                 row.map((piece, ci) => {
                   const isLight = (ri + ci) % 2 === 0;
                   const isSelected = selected?.r === ri && selected?.c === ci;
-                  const isLegal = legalMoves.some((m) => m.tr === ri && m.tc === ci);
+                  const legalMove = legalMoves.find((m) => m.tr === ri && m.tc === ci);
+                  const isLegalEmpty = Boolean(legalMove && !board[ri][ci]);
+                  const isLegalCapture = Boolean(legalMove && board[ri][ci]);
                   const isMoved = Boolean(lastMove?.some((sq) => sq.r === ri && sq.c === ci));
                   const isPieceOfCurrentTurn = Boolean(piece && piece[0] === turn && !isGameOver);
-                  const isSelectable = !isGameOver && (isPieceOfCurrentTurn || isLegal || isSelected);
+                  const isSelectable = !isGameOver && (isPieceOfCurrentTurn || Boolean(legalMove) || isSelected);
+                  const isDragging = draggingSquare?.r === ri && draggingSquare?.c === ci;
+                  const isInCheck = kingInCheckPos && kingInCheckPos[0] === ri && kingInCheckPos[1] === ci;
                   const className = [
                     "sq",
                     isLight ? "light" : "dark",
                     isMoved && "moved",
                     isSelected && "selected",
-                    isLegal && "legal",
+                    isLegalEmpty && "legal-empty",
+                    isLegalCapture && "legal-capture",
                     isSelectable && "selectable",
+                    isPieceOfCurrentTurn && "piece-grabbable",
+                    isDragging && "dragging",
+                    isInCheck && "in-check",
                   ].filter(Boolean).join(" ");
                   return (
-                    <div key={`${ri}-${ci}`} className={className} onClick={() => onSquareClick(ri, ci)}>
+                    <div
+                      key={`${ri}-${ci}`}
+                      className={className}
+                      draggable={isPieceOfCurrentTurn}
+                      onClick={() => onSquareClick(ri, ci)}
+                      onDragStart={(e) => onDragStart(e, ri, ci)}
+                      onDragOver={(e) => onDragOver(e, ri, ci)}
+                      onDrop={(e) => onDrop(e, ri, ci)}
+                      onDragEnd={onDragEnd}
+                    >
                       {piece ? PIECES[piece] : ""}
                     </div>
                   );
@@ -725,7 +805,7 @@ function LocalGamePage() {
           <div className="card">
             <div className="card-title" style={{fontSize:"1rem"}}>How to play</div>
             <div className="card-body">
-              Click one of your pieces, then click a highlighted square to move.
+              Click a piece to select it, then click a highlighted square to move — or simply drag a piece directly to its destination.
               <br /><br />
               Includes all standard rules: castling, en passant, pawn promotion, check, checkmate, and stalemate detection.
             </div>
@@ -788,6 +868,10 @@ function GamePage() {
 
   // Analysis state (async — null means "loading or not yet fetched")
   const [analysis, setAnalysis]         = useState(null);
+
+  // Drag state
+  const [draggingSquare, setDraggingSquare] = useState(null);
+  const dragValidDrop = useRef(false);
 
   // Engine is thinking whenever it is Black's turn.
   const engineThinking = turn === "b";
@@ -913,6 +997,48 @@ function GamePage() {
     setMovesFromSquare(getLegalMovesWithRules(board, r, c, gameState));
   }
 
+  function onDragStart(e, r, c) {
+    if (turn !== "w" || engineThinking || status === "checkmate" || status === "stalemate") {
+      e.preventDefault(); return;
+    }
+    const piece = board[r][c];
+    if (!piece || piece[0] !== "w") { e.preventDefault(); return; }
+    const ghost = document.createElement("div");
+    ghost.textContent = PIECES[piece];
+    ghost.style.cssText = "position:fixed;top:-200px;font-size:3.2rem;pointer-events:none;";
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 36, 36);
+    e.dataTransfer.effectAllowed = "move";
+    setTimeout(() => ghost.remove(), 0);
+    setDraggingSquare({ r, c });
+    setSelected([r, c]);
+    setMovesFromSquare(getLegalMovesWithRules(board, r, c, gameState));
+  }
+
+  function onDragOver(e, r, c) {
+    const isLegalTarget = movesFromSquare.some((m) => m.tr === r && m.tc === c);
+    if (isLegalTarget) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+    }
+  }
+
+  function onDrop(e, r, c) {
+    e.preventDefault();
+    dragValidDrop.current = true;
+    onSquareClick(r, c);
+    setDraggingSquare(null);
+  }
+
+  function onDragEnd() {
+    if (!dragValidDrop.current) {
+      setSelected(null);
+      setMovesFromSquare([]);
+    }
+    dragValidDrop.current = false;
+    setDraggingSquare(null);
+  }
+
   // ── Derived values ─────────────────────────────────────────────────────────
   const isGameOver = status === "checkmate" || status === "stalemate";
   // Lock the engine strength as soon as a move has been played so changing it
@@ -922,6 +1048,14 @@ function GamePage() {
   const moveDests = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
   const { label: ratingLabel, css: ratingCss } = strengthLabel(engineRating);
   const evalText = analysis ? formatEval(analysis.evaluation, analysis.mate) : "0.0";
+
+  const canInteract = turn === "w" && !engineThinking && !isGameOver;
+
+  const kingInCheckPos = (() => {
+    if (status !== "check" && status !== "checkmate") return null;
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (board[r][c] === `${turn}K`) return [r, c];
+    return null;
+  })();
 
   let turnLabel;
   if (status === "checkmate") {
@@ -1001,12 +1135,31 @@ function GamePage() {
                 row.map((piece, ci) => {
                   const isLight = (ri + ci) % 2 === 0;
                   const isSelected = selected && selected[0] === ri && selected[1] === ci;
-                  const canMove = moveDests.has(`${ri}-${ci}`);
+                  const isLegalEmpty = moveDests.has(`${ri}-${ci}`) && !board[ri][ci];
+                  const isLegalCapture = moveDests.has(`${ri}-${ci}`) && Boolean(board[ri][ci]);
+                  const isWhitePiece = Boolean(piece && piece[0] === "w");
+                  const isDragging = draggingSquare?.r === ri && draggingSquare?.c === ci;
+                  const isInCheck = kingInCheckPos && kingInCheckPos[0] === ri && kingInCheckPos[1] === ci;
+                  const className = [
+                    "sq",
+                    isLight ? "light" : "dark",
+                    isSelected && "selected",
+                    isLegalEmpty && "legal-empty",
+                    isLegalCapture && "legal-capture",
+                    canInteract && isWhitePiece && "piece-grabbable",
+                    isDragging && "dragging",
+                    isInCheck && "in-check",
+                  ].filter(Boolean).join(" ");
                   return (
                     <div
                       key={`${ri}-${ci}`}
-                      className={`sq ${isLight ? "light" : "dark"} ${isSelected || canMove ? "highlight" : ""}`}
+                      className={className}
+                      draggable={canInteract && isWhitePiece}
                       onClick={() => onSquareClick(ri, ci)}
+                      onDragStart={(e) => onDragStart(e, ri, ci)}
+                      onDragOver={(e) => onDragOver(e, ri, ci)}
+                      onDrop={(e) => onDrop(e, ri, ci)}
+                      onDragEnd={onDragEnd}
                     >
                       {piece ? PIECES[piece] : ""}
                     </div>
