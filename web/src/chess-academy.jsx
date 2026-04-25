@@ -1010,7 +1010,7 @@ function GamePage() {
     e.dataTransfer.setDragImage(ghost, 36, 36);
     e.dataTransfer.effectAllowed = "move";
     setTimeout(() => ghost.remove(), 0);
-    setDraggingSquare([r, c]);
+    setDraggingSquare({ r, c });
     setSelected([r, c]);
     setMovesFromSquare(getLegalMovesWithRules(board, r, c, gameState));
   }
@@ -1138,7 +1138,7 @@ function GamePage() {
                   const isLegalEmpty = moveDests.has(`${ri}-${ci}`) && !board[ri][ci];
                   const isLegalCapture = moveDests.has(`${ri}-${ci}`) && Boolean(board[ri][ci]);
                   const isWhitePiece = Boolean(piece && piece[0] === "w");
-                  const isDragging = draggingSquare && draggingSquare[0] === ri && draggingSquare[1] === ci;
+                  const isDragging = draggingSquare?.r === ri && draggingSquare?.c === ci;
                   const isInCheck = kingInCheckPos && kingInCheckPos[0] === ri && kingInCheckPos[1] === ci;
                   const className = [
                     "sq",
