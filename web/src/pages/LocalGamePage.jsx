@@ -188,12 +188,8 @@ export default function LocalGamePage() {
       if (v >= historyStack.length) return v; // already at start
       const next = v + 1;
       playNavStep();
-      const stackIdx = historyStack.length - next;
-      if (stackIdx >= 0) {
-        const snap = historyStack[stackIdx];
-        const moveCount = historyStack.length - next;
-        setAriaMsg(`Move ${moveCount} of ${historyStack.length}`);
-      }
+      const moveIndex = historyStack.length - next;
+      setAriaMsg(`Move ${moveIndex} of ${historyStack.length}`);
       return next;
     });
   }, [historyStack]);
