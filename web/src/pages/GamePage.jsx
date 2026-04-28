@@ -208,12 +208,18 @@ export default function GamePage() {
   }
 
   // ── Derived display values ─────────────────────────────────────────────────
+  // Evaluation bar constants
+  const MATE_EVAL_MAGNITUDE = 10;  // treat mate as ±10 pawns for bar display
+  const MIN_BAR_PERCENT     = 4;   // never collapse the bar completely
+  const MAX_BAR_PERCENT     = 96;
+  const EVAL_SCALE_FACTOR   = 4.6; // pawns → percentage points (10 pawns ≈ 46 pp)
+
   const moveDests    = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
   const evalText     = analysis ? formatEval(analysis.evaluation, analysis.mate) : "…";
   const evalNum      = analysis?.mate != null
-    ? (analysis.mate > 0 ? 10 : -10)
+    ? (analysis.mate > 0 ? MATE_EVAL_MAGNITUDE : -MATE_EVAL_MAGNITUDE)
     : (analysis?.evaluation ?? 0);
-  const whitePercent = Math.max(4, Math.min(96, 50 + evalNum * 4.6));
+  const whitePercent = Math.max(MIN_BAR_PERCENT, Math.min(MAX_BAR_PERCENT, 50 + evalNum * EVAL_SCALE_FACTOR));
 
   // Build move pairs for the move list
   const movePairs = [];
@@ -323,7 +329,9 @@ export default function GamePage() {
           <div className="lc-avatar lc-avatar-white">♔</div>
           <span className="lc-player-name">White</span>
           {isAtLatest && analysis && !engineThinking && (
-            <span className="lc-player-eval">{evalNum > 0 ? `+${evalNum.toFixed(1)}` : ""}</span>
+            <span className="lc-player-eval">
+              {evalNum > 0 ? `+${evalNum.toFixed(1)}` : evalNum < 0 ? evalNum.toFixed(1) : "="}
+            </span>
           )}
         </div>
       </div>
@@ -366,7 +374,7 @@ export default function GamePage() {
                   {evalText}
                 </span>
                 <span className="lc-engine-best">
-                  Best: {moveLabel(viewedState.board, analysis.move)}
+                  Best: {analysis.move ? moveLabel(viewedState.board, analysis.move) : "None"}
                 </span>
                 {analysis.source === "local" && (
                   <span className="lc-engine-src">(local)</span>
