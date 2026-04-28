@@ -17,6 +17,28 @@ import {
   MAX_ENGINE_RATING,
 } from "../stockfish-api.js";
 import { strengthLabel, formatEval } from "../utils/formatters.js";
+import {
+  playMove,
+  playCapture,
+  playCheck,
+  playCheckmate,
+  playIllegal,
+  playGameStart,
+  playNavStep,
+} from "../utils/chessSound.js";
+
+const FILES = "abcdefgh";
+
+function buildAnnouncement(toR, toC, isCapture, status, side) {
+  const file = FILES[toC];
+  const rank = 8 - toR;
+  const verb = isCapture ? "captures on" : "plays";
+  let msg = `${side} ${verb} ${file}${rank}`;
+  if (status === "checkmate") msg += " — Checkmate!";
+  else if (status === "check") msg += " — Check";
+  else if (status === "stalemate") msg = "Stalemate — Draw";
+  return msg;
+}
 
 export default function GamePage() {
   // Board & game state
@@ -25,6 +47,7 @@ export default function GamePage() {
   const [selected, setSelected]         = useState(null);
   const [movesFromSquare, setMovesFromSquare] = useState([]);
   const [history, setHistory]           = useState([]);
+  const [lastMove, setLastMove]         = useState(null);
 
   // UI state
   const [activeTab, setActiveTab]       = useState("play");
@@ -36,6 +59,15 @@ export default function GamePage() {
 
   // Snapshots for undo (each snapshot is the state *before* a move).
   const [historyStack, setHistoryStack] = useState([]);
+
+  // Navigation history: [{board, lastMove}] — grows with every half-move.
+  // navHistory[0] = initial position, navHistory[k] = after k half-moves.
+  const [navHistory, setNavHistory] = useState(() => [{ board: START.map(r => [...r]), lastMove: null }]);
+  // navIndex: 0 = initial, navHistory.length-1 = live (latest)
+  const [navIndex, setNavIndex] = useState(0);
+
+  // Aria live region
+  const [ariaMsg, setAriaMsg] = useState("");
 
   // Analysis state (async — null means "loading or not yet fetched")
   const [analysis, setAnalysis]         = useState(null);
@@ -63,13 +95,27 @@ export default function GamePage() {
       if (cancelled || requestId !== moveRequestId.current) return;
 
       if (move) {
+        const isCapture = Boolean(board[move.tr][move.tc]);
         const { board: nextBoard, gameState: nextGS } =
           applyMoveWithRules(board, move, gameState);
         const nextStatus = getGameStatus(nextBoard, "w", nextGS);
+        const nextLastMove = [{ r: move.r, c: move.c }, { r: move.tr, c: move.tc }];
+
+        // Sound
+        if (nextStatus === "checkmate") playCheckmate();
+        else if (nextStatus === "check") playCheck();
+        else if (isCapture) playCapture();
+        else playMove();
+
+        setAriaMsg(buildAnnouncement(move.tr, move.tc, isCapture, nextStatus, "Black"));
+
         setBoard(nextBoard);
         setGameState(nextGS);
+        setLastMove(nextLastMove);
         setHistory(prev => [...prev, `Black: ${formatMove(move)}`]);
         setStatus(nextStatus);
+        setNavHistory(prev => [...prev, { board: nextBoard, lastMove: nextLastMove }]);
+        setNavIndex(prev => prev + 1);
       }
       setTurn("w");
     });
@@ -100,10 +146,15 @@ export default function GamePage() {
     setSelected(null);
     setMovesFromSquare([]);
     setHistory([]);
+    setLastMove(null);
     setAnalysis(null);
     setGameState(createGameState());
     setStatus("playing");
     setHistoryStack([]);
+    setNavHistory([{ board: START.map(r => [...r]), lastMove: null }]);
+    setNavIndex(0);
+    setAriaMsg("Game reset");
+    playGameStart();
   }, []);
 
   // ── Undo ───────────────────────────────────────────────────────────────────
@@ -123,9 +174,14 @@ export default function GamePage() {
       setGameState(snap.gameState);
       setStatus(snap.status);
       setHistory(snap.history);
+      setLastMove(snap.lastMove ?? null);
       setSelected(null);
       setMovesFromSquare([]);
       setAnalysis(null);
+      // Trim navHistory to match restored position (snap.history.length half-moves)
+      const trimTo = snap.history.length + 1;
+      setNavHistory(prev => prev.slice(0, trimTo));
+      setNavIndex(snap.history.length);
       return stack;
     });
   }, []);
@@ -136,29 +192,51 @@ export default function GamePage() {
 
   // ── Square click handler ───────────────────────────────────────────────────
   function onSquareClick(r, c) {
-    if (turn !== "w" || engineThinking) return;
-    if (status === "checkmate" || status === "stalemate") return;
-
-    const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
-    if (selected && chosenMove) {
-      const snapshot = { board, turn, gameState, status, history };
-      const { board: nextBoard, gameState: nextGameState } =
-        applyMoveWithRules(board, chosenMove, gameState);
-      const nextStatus = getGameStatus(nextBoard, "b", nextGameState);
-
-      setHistoryStack(prev => [...prev, snapshot]);
-      setBoard(nextBoard);
-      setGameState(nextGameState);
-      setHistory(prev => [...prev, `White: ${formatMove(chosenMove)}`]);
-      setTurn("b");
-      setStatus(nextStatus);
+    // Snap out of review mode on any click
+    if (navIndex < navHistory.length - 1) {
+      setNavIndex(navHistory.length - 1);
       setSelected(null);
       setMovesFromSquare([]);
       return;
     }
 
+    if (turn !== "w" || engineThinking) return;
+    if (status === "checkmate" || status === "stalemate") return;
+
+    const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
+    if (selected && chosenMove) {
+      const isCapture = Boolean(board[chosenMove.tr][chosenMove.tc]);
+      const snapshot = { board, turn, gameState, status, history, lastMove };
+      const { board: nextBoard, gameState: nextGameState } =
+        applyMoveWithRules(board, chosenMove, gameState);
+      const nextStatus = getGameStatus(nextBoard, "b", nextGameState);
+      const nextLastMove = [{ r: chosenMove.r, c: chosenMove.c }, { r: chosenMove.tr, c: chosenMove.tc }];
+
+      // Sound
+      if (nextStatus === "checkmate") playCheckmate();
+      else if (nextStatus === "check") playCheck();
+      else if (isCapture) playCapture();
+      else playMove();
+
+      setAriaMsg(buildAnnouncement(chosenMove.tr, chosenMove.tc, isCapture, nextStatus, "White"));
+
+      setHistoryStack(prev => [...prev, snapshot]);
+      setBoard(nextBoard);
+      setGameState(nextGameState);
+      setLastMove(nextLastMove);
+      setHistory(prev => [...prev, `White: ${formatMove(chosenMove)}`]);
+      setTurn("b");
+      setStatus(nextStatus);
+      setSelected(null);
+      setMovesFromSquare([]);
+      setNavHistory(prev => [...prev, { board: nextBoard, lastMove: nextLastMove }]);
+      setNavIndex(prev => prev + 1);
+      return;
+    }
+
     const piece = board[r][c];
     if (!piece || piece[0] !== "w") {
+      if (selected) playIllegal();
       setSelected(null);
       setMovesFromSquare([]);
       return;
@@ -169,6 +247,7 @@ export default function GamePage() {
   }
 
   function onDragStart(e, r, c) {
+    if (navIndex < navHistory.length - 1) { e.preventDefault(); return; } // can't drag in review mode
     if (turn !== "w" || engineThinking || status === "checkmate" || status === "stalemate") {
       e.preventDefault(); return;
     }
@@ -210,6 +289,54 @@ export default function GamePage() {
     setDraggingSquare(null);
   }
 
+  // ── Keyboard navigation ─────────────────────────────────────────────────────
+  const liveNavIndex = navHistory.length - 1;
+  const isReviewing = navIndex < liveNavIndex;
+
+  const goBack = useCallback(() => {
+    setNavIndex(v => {
+      if (v <= 0) return v;
+      playNavStep();
+      setAriaMsg(`Move ${v - 1} of ${liveNavIndex}`);
+      return v - 1;
+    });
+  }, [liveNavIndex]);
+
+  const goForward = useCallback(() => {
+    setNavIndex(v => {
+      if (v >= liveNavIndex) return v;
+      playNavStep();
+      const next = v + 1;
+      setAriaMsg(next >= liveNavIndex ? "Live position" : `Move ${next} of ${liveNavIndex}`);
+      return next;
+    });
+  }, [liveNavIndex]);
+
+  const goToStart = useCallback(() => {
+    if (liveNavIndex === 0) return;
+    playNavStep();
+    setNavIndex(0);
+    setAriaMsg("Start position");
+  }, [liveNavIndex]);
+
+  const goToEnd = useCallback(() => {
+    if (!isReviewing) return;
+    playNavStep();
+    setNavIndex(liveNavIndex);
+    setAriaMsg("Live position");
+  }, [isReviewing, liveNavIndex]);
+
+  function handleKeyDown(e) {
+    if (e.key === "ArrowLeft")  { e.preventDefault(); goBack(); }
+    if (e.key === "ArrowRight") { e.preventDefault(); goForward(); }
+    if (e.key === "Home")       { e.preventDefault(); goToStart(); }
+    if (e.key === "End")        { e.preventDefault(); goToEnd(); }
+  }
+
+  // ── Derive view state ──────────────────────────────────────────────────────
+  const viewBoard = navHistory[navIndex]?.board ?? board;
+  const viewLastMove = navHistory[navIndex]?.lastMove ?? lastMove;
+
   // ── Derived values ─────────────────────────────────────────────────────────
   const isGameOver = status === "checkmate" || status === "stalemate";
   // Lock the engine strength as soon as a move has been played so changing it
@@ -220,7 +347,7 @@ export default function GamePage() {
   const { label: ratingLabel, css: ratingCss } = strengthLabel(engineRating);
   const evalText = analysis ? formatEval(analysis.evaluation, analysis.mate) : "0.0";
 
-  const canInteract = turn === "w" && !engineThinking && !isGameOver;
+  const canInteract = turn === "w" && !engineThinking && !isGameOver && !isReviewing;
 
   const kingInCheckPos = (() => {
     if (status !== "check" && status !== "checkmate") return null;
@@ -244,6 +371,9 @@ export default function GamePage() {
 
   return (
     <div className="fade-in">
+      {/* Screen-reader live region */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">{ariaMsg}</div>
+
       <div className="page-title">Play vs Stockfish</div>
       <div className="page-subtitle">
         Play as White against the Stockfish engine. Adjust strength and switch to Analysis for recommendations.
@@ -293,7 +423,13 @@ export default function GamePage() {
       </div>
 
       <div className="board-wrap">
-        <div className="board-outer">
+        <div
+          className="board-outer"
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
+          aria-label={`Chess board. ${isReviewing ? `Reviewing move ${navIndex} of ${liveNavIndex}.` : turnLabel} Use arrow keys to navigate move history.`}
+          style={{outline:"none"}}
+        >
           <div className="board-files">
             {["a","b","c","d","e","f","g","h"].map(f => <div key={f} className="board-file-label">{f}</div>)}
           </div>
@@ -302,18 +438,20 @@ export default function GamePage() {
               {[8,7,6,5,4,3,2,1].map(r => <div key={r} className="board-rank-label">{r}</div>)}
             </div>
             <div className="board">
-              {board.map((row, ri) =>
+              {viewBoard.map((row, ri) =>
                 row.map((piece, ci) => {
                   const isLight = (ri + ci) % 2 === 0;
-                  const isSelected = selected && selected[0] === ri && selected[1] === ci;
-                  const isLegalEmpty = moveDests.has(`${ri}-${ci}`) && !board[ri][ci];
-                  const isLegalCapture = moveDests.has(`${ri}-${ci}`) && Boolean(board[ri][ci]);
+                  const isSelected = !isReviewing && selected && selected[0] === ri && selected[1] === ci;
+                  const isLegalEmpty = !isReviewing && moveDests.has(`${ri}-${ci}`) && !viewBoard[ri][ci];
+                  const isLegalCapture = !isReviewing && moveDests.has(`${ri}-${ci}`) && Boolean(viewBoard[ri][ci]);
                   const isWhitePiece = Boolean(piece && piece[0] === "w");
-                  const isDragging = draggingSquare?.r === ri && draggingSquare?.c === ci;
+                  const isMoved = Boolean(viewLastMove?.some(sq => sq.r === ri && sq.c === ci));
+                  const isDragging = !isReviewing && draggingSquare?.r === ri && draggingSquare?.c === ci;
                   const isInCheck = kingInCheckPos && kingInCheckPos[0] === ri && kingInCheckPos[1] === ci;
                   const className = [
                     "sq",
                     isLight ? "light" : "dark",
+                    isMoved && "moved",
                     isSelected && "selected",
                     isLegalEmpty && "legal-empty",
                     isLegalCapture && "legal-capture",
@@ -339,6 +477,43 @@ export default function GamePage() {
               )}
             </div>
           </div>
+          {/* Navigation buttons + move counter */}
+          <div className="board-nav">
+            <button
+              className="nav-arrow"
+              disabled={liveNavIndex === 0}
+              onClick={goToStart}
+              aria-label="Go to start"
+            >⟪</button>
+            <button
+              className="nav-arrow"
+              disabled={navIndex <= 0}
+              onClick={goBack}
+              aria-label="Previous move"
+            >‹</button>
+            <button
+              className="nav-arrow"
+              disabled={navIndex >= liveNavIndex}
+              onClick={goForward}
+              aria-label="Next move"
+            >›</button>
+            <button
+              className="nav-arrow"
+              disabled={!isReviewing}
+              onClick={goToEnd}
+              aria-label="Go to latest move"
+            >⟫</button>
+            {liveNavIndex > 0 && (
+              <span className={`nav-counter${isReviewing ? " reviewing" : ""}`}>
+                {navIndex} / {liveNavIndex}
+              </span>
+            )}
+          </div>
+          {isReviewing && (
+            <div className="board-review-hint">
+              Reviewing history — click board to return to live
+            </div>
+          )}
         </div>
 
         <div className="move-list-wrap">
@@ -377,9 +552,18 @@ export default function GamePage() {
           <div className="move-list">
             {history.length === 0 && <span className="move-number">No moves yet</span>}
             {history.map((entry, i) => (
-              <div key={i} className="move-chip">{entry}</div>
+              <div
+                key={i}
+                className={`move-chip${navIndex === i + 1 && isReviewing ? " active" : ""}`}
+                onClick={() => { setNavIndex(i + 1); setAriaMsg(`Move ${i + 1} of ${liveNavIndex}`); }}
+              >{entry}</div>
             ))}
           </div>
+          {history.length > 0 && (
+            <div style={{fontSize:"0.75rem",color:"var(--muted)",marginTop:"0.3rem"}}>
+              Use <strong>← →</strong> arrow keys to step through moves.
+            </div>
+          )}
         </div>
       </div>
     </div>
