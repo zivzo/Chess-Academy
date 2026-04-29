@@ -1,6 +1,7 @@
 // ── Chess Academy — root application component ────────────────────────────────
 import { useState } from "react";
 import { OPENINGS } from "./chess-core.js";
+import { isMuted, toggleMute } from "./utils/chessSound.js";
 import GlobalStyles from "./styles/GlobalStyles.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import OpeningsPage from "./pages/OpeningsPage.jsx";
@@ -14,6 +15,12 @@ import QuizPage from "./pages/QuizPage.jsx";
 export default function ChessAcademy() {
   const [page, setPage] = useState("home");
   const [selectedOpening, setSelectedOpening] = useState(null);
+  const [soundMuted, setSoundMuted] = useState(isMuted);
+
+  function handleToggleSound() {
+    const next = toggleMute();
+    setSoundMuted(next);
+  }
 
   const NAV = [
     { id:"home", label:"🏠 Home" },
@@ -47,6 +54,14 @@ export default function ChessAcademy() {
                 {n.label}
               </button>
             ))}
+            <button
+              className="mute-btn"
+              onClick={handleToggleSound}
+              aria-label="Toggle sound"
+              title={soundMuted ? "Sound off — click to enable" : "Sound on — click to mute"}
+            >
+              {soundMuted ? "🔇" : "🔊"}
+            </button>
           </nav>
         </header>
 

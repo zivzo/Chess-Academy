@@ -367,5 +367,32 @@ export default function GlobalStyles() { return (
 
     .fade-in { animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Mute toggle button (in header) ── */
+    .mute-btn {
+      background: none; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px;
+      cursor: pointer; color: #C8B99A; padding: 0.35rem 0.55rem; font-size: 1rem;
+      margin-left: 0.4rem; line-height: 1; transition: all 0.18s; flex-shrink: 0;
+    }
+    .mute-btn:hover { background: rgba(255,255,255,0.08); color: var(--cream); }
+
+    /* ── Screen-reader-only (visually hidden, accessible) ── */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    /* ── Move navigation counter ── */
+    .nav-counter {
+      font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted);
+      padding: 0 0.3rem; display: flex; align-items: center;
+    }
+    .nav-counter.reviewing { color: var(--gold); font-weight: 600; }
+
+    /* ── Review-mode overlay hint on the board ── */
+    .board-review-hint {
+      font-size: 0.72rem; color: var(--gold); font-weight: 600;
+      text-align: center; margin-top: 0.3rem; letter-spacing: 0.2px;
+    }
   `}</style>
 ); }
