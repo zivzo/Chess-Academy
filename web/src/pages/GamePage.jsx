@@ -90,7 +90,7 @@ export default function GamePage() {
     let cancelled = false;
     const requestId = ++moveRequestId.current;
 
-    getStockfishMove(board, "b", engineRating).then((move) => {
+    getStockfishMove(board, "b", engineRating, gameState).then((move) => {
       // Ignore if a newer request was started or the effect was cleaned up.
       if (cancelled || requestId !== moveRequestId.current) return;
 
@@ -129,14 +129,14 @@ export default function GamePage() {
 
     let cancelled = false;
 
-    getStockfishAnalysis(board, turn).then((result) => {
+    getStockfishAnalysis(board, turn, gameState).then((result) => {
       if (!cancelled) {
         setAnalysis(result);
       }
     });
 
     return () => { cancelled = true; };
-  }, [board, turn, activeTab]);
+  }, [board, turn, activeTab, gameState]);
 
   // ── Reset ──────────────────────────────────────────────────────────────────
   const resetGame = useCallback(() => {

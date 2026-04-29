@@ -17,7 +17,9 @@
 
 import {
   generatePseudoLegalMoves,
+  getAllLegalMoves,
   applyBoardMove,
+  applyMoveWithRules,
   evaluateBoard,
 } from "./chess-core.js";
 
@@ -58,13 +60,14 @@ const PIECE_TO_FEN = {
  *
  * @param {(string|null)[][]} board - 8×8 board (row 0 = rank 8).
  * @param {"w"|"b"} turn           - Side to move.
+ * @param {object}  [gameState]    - Optional game state for accurate castling rights and en passant.
  * @returns {string} A standard FEN string.
  *
  * @example
  *   boardToFEN(START, "w")
  *   // "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
  */
-export function boardToFEN(board, turn) {
+export function boardToFEN(board, turn, gameState) {
   const ranks = [];
 
   for (let r = 0; r < 8; r++) {
@@ -85,19 +88,33 @@ export function boardToFEN(board, turn) {
     ranks.push(rank);
   }
 
-  // Simplified castling: assume rights exist if king + rook are on start squares.
+  // Use gameState castling rights if available, otherwise infer from piece positions
   let castling = "";
-  if (board[7][4] === "wK") {
-    if (board[7][7] === "wR") castling += "K";
-    if (board[7][0] === "wR") castling += "Q";
-  }
-  if (board[0][4] === "bK") {
-    if (board[0][7] === "bR") castling += "k";
-    if (board[0][0] === "bR") castling += "q";
+  if (gameState) {
+    if (gameState.castlingRights.wK) castling += "K";
+    if (gameState.castlingRights.wQ) castling += "Q";
+    if (gameState.castlingRights.bK) castling += "k";
+    if (gameState.castlingRights.bQ) castling += "q";
+  } else {
+    if (board[7][4] === "wK") {
+      if (board[7][7] === "wR") castling += "K";
+      if (board[7][0] === "wR") castling += "Q";
+    }
+    if (board[0][4] === "bK") {
+      if (board[0][7] === "bR") castling += "k";
+      if (board[0][0] === "bR") castling += "q";
+    }
   }
   if (!castling) castling = "-";
 
-  return `${ranks.join("/")} ${turn} ${castling} - 0 1`;
+  // Use en passant square from gameState if available
+  let epSquare = "-";
+  if (gameState && gameState.enPassantSquare) {
+    const ep = gameState.enPassantSquare;
+    epSquare = `${FILES[ep.c]}${8 - ep.r}`;
+  }
+
+  return `${ranks.join("/")} ${turn} ${castling} ${epSquare} 0 1`;
 }
 
 // ── UCI move parsing ─────────────────────────────────────────────────────────
@@ -237,17 +254,22 @@ function applyWeakness(bestMove, allMoves, rating) {
  *
  * @param {(string|null)[][]} board
  * @param {"w"|"b"} side
+ * @param {object} [gameState] - Game state for legal move generation.
  * @returns {{ r:number, c:number, tr:number, tc:number, evaluation:number }|null}
  */
-function localEngineFallback(board, side) {
-  const moves = generatePseudoLegalMoves(board, side);
+function localEngineFallback(board, side, gameState) {
+  const moves = gameState
+    ? getAllLegalMoves(board, side, gameState)
+    : generatePseudoLegalMoves(board, side);
   if (moves.length === 0) return null;
 
   let bestMove = moves[0];
   let bestScore = -Infinity;
 
   for (const move of moves) {
-    const nextBoard = applyBoardMove(board, move);
+    const nextBoard = gameState
+      ? applyMoveWithRules(board, move, gameState).board
+      : applyBoardMove(board, move);
     const raw = evaluateBoard(nextBoard);
     const score = side === "w" ? raw : -raw;
     if (score > bestScore) {
@@ -256,9 +278,13 @@ function localEngineFallback(board, side) {
     }
   }
 
+  const evalBoard = gameState
+    ? applyMoveWithRules(board, bestMove, gameState).board
+    : applyBoardMove(board, bestMove);
+
   return {
     ...bestMove,
-    evaluation: evaluateBoard(applyBoardMove(board, bestMove)),
+    evaluation: evaluateBoard(evalBoard),
   };
 }
 
@@ -277,17 +303,27 @@ function localEngineFallback(board, side) {
  * @param {(string|null)[][]} board  - 8×8 board array.
  * @param {"w"|"b"} side            - Side to move.
  * @param {number}  [rating=1500]   - Engine strength (200–3000 Elo).
+ * @param {object}  [gameState]     - Game state for legal move generation.
  * @returns {Promise<{ r:number, c:number, tr:number, tc:number, evaluation:number, source:string }|null>}
  */
-export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATING) {
-  const allMoves = generatePseudoLegalMoves(board, side);
+export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATING, gameState) {
+  const allMoves = gameState
+    ? getAllLegalMoves(board, side, gameState)
+    : generatePseudoLegalMoves(board, side);
   if (allMoves.length === 0) return null;
 
   try {
-    const fen   = boardToFEN(board, side);
+    const fen   = boardToFEN(board, side, gameState);
     const depth = ratingToDepth(rating);
     const result = await fetchStockfishMove(fen, depth);
-    const bestMove = parseUCIMove(result.bestmove);
+    const parsedMove = parseUCIMove(result.bestmove);
+
+    // Match the API move against our legal moves to get proper flags
+    // (castling, enPassant, promotion) and ensure the move is legal.
+    const bestMove = allMoves.find(m =>
+      m.r === parsedMove.r && m.c === parsedMove.c &&
+      m.tr === parsedMove.tr && m.tc === parsedMove.tc
+    ) || allMoves[0];
 
     const finalMove = applyWeakness(bestMove, allMoves, rating);
 
@@ -300,7 +336,7 @@ export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATI
     return { ...finalMove, evaluation, source: "stockfish" };
   } catch {
     // API unavailable — fall back to local engine.
-    const fallback = localEngineFallback(board, side);
+    const fallback = localEngineFallback(board, side, gameState);
     if (!fallback) return null;
 
     const finalMove = applyWeakness(fallback, allMoves, rating);
@@ -318,16 +354,25 @@ export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATI
  *
  * @param {(string|null)[][]} board - 8×8 board array.
  * @param {"w"|"b"} side           - Side to move.
+ * @param {object}  [gameState]    - Game state for legal move generation.
  * @returns {Promise<{ move:{r,c,tr,tc}, evaluation:number, mate:number|null, source:string }|null>}
  */
-export async function getStockfishAnalysis(board, side) {
-  const allMoves = generatePseudoLegalMoves(board, side);
+export async function getStockfishAnalysis(board, side, gameState) {
+  const allMoves = gameState
+    ? getAllLegalMoves(board, side, gameState)
+    : generatePseudoLegalMoves(board, side);
   if (allMoves.length === 0) return null;
 
   try {
-    const fen    = boardToFEN(board, side);
+    const fen    = boardToFEN(board, side, gameState);
     const result = await fetchStockfishMove(fen, 15);
-    const move   = parseUCIMove(result.bestmove);
+    const parsedMove = parseUCIMove(result.bestmove);
+
+    // Match against legal moves for proper flags
+    const move = allMoves.find(m =>
+      m.r === parsedMove.r && m.c === parsedMove.c &&
+      m.tr === parsedMove.tr && m.tc === parsedMove.tc
+    ) || allMoves[0];
 
     return {
       move,
@@ -336,7 +381,7 @@ export async function getStockfishAnalysis(board, side) {
       source: "stockfish",
     };
   } catch {
-    const fallback = localEngineFallback(board, side);
+    const fallback = localEngineFallback(board, side, gameState);
     if (!fallback) return null;
 
     return {
