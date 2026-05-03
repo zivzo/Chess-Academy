@@ -15,6 +15,8 @@ export default function GlobalStyles() { return (
       --green: #4A7C59;
       --green-light: #6AAB7E;
       --red: #A63D2F;
+      --blue: #3A6FA8;
+      --purple: #7B4E9E;
       --muted: #7A6E62;
       --border: #D4C9B0;
       --sq-light: #F0D9B5;
@@ -145,6 +147,8 @@ export default function GlobalStyles() { return (
     .opening-card.color-green::before { background: var(--green); }
     .opening-card.color-gold::before { background: var(--gold); }
     .opening-card.color-red::before { background: var(--red); }
+    .opening-card.color-blue::before { background: var(--blue); }
+    .opening-card.color-purple::before { background: var(--purple); }
     .opening-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-color: var(--gold); }
     .opening-card h3 { font-family: 'Playfair Display', serif; font-size: 1.05rem; color: var(--brown); margin-bottom: 0.4rem; }
     .opening-card p { font-size: 0.82rem; color: var(--muted); line-height: 1.55; margin-bottom: 0.75rem; }
@@ -367,6 +371,33 @@ export default function GlobalStyles() { return (
 
     .fade-in { animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Mute toggle button (in header) ── */
+    .mute-btn {
+      background: none; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px;
+      cursor: pointer; color: #C8B99A; padding: 0.35rem 0.55rem; font-size: 1rem;
+      margin-left: 0.4rem; line-height: 1; transition: all 0.18s; flex-shrink: 0;
+    }
+    .mute-btn:hover { background: rgba(255,255,255,0.08); color: var(--cream); }
+
+    /* ── Screen-reader-only (visually hidden, accessible) ── */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    /* ── Move navigation counter ── */
+    .nav-counter {
+      font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted);
+      padding: 0 0.3rem; display: flex; align-items: center;
+    }
+    .nav-counter.reviewing { color: var(--gold); font-weight: 600; }
+
+    /* ── Review-mode overlay hint on the board ── */
+    .board-review-hint {
+      font-size: 0.72rem; color: var(--gold); font-weight: 600;
+      text-align: center; margin-top: 0.3rem; letter-spacing: 0.2px;
+    }
 
     /* ═══════════════════════════════════════════════════════════════════════
        Lichess-style dark game interface  (.lc-*)

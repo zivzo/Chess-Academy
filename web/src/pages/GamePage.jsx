@@ -16,8 +16,28 @@ import {
   MAX_ENGINE_RATING,
 } from "../stockfish-api.js";
 import { strengthLabel, formatEval } from "../utils/formatters.js";
+import {
+  playMove,
+  playCapture,
+  playCheck,
+  playCheckmate,
+  playIllegal,
+  playGameStart,
+  playNavStep,
+} from "../utils/chessSound.js";
 
 const FILES = "abcdefgh";
+
+function buildAnnouncement(toR, toC, isCapture, status, side) {
+  const file = FILES[toC];
+  const rank = 8 - toR;
+  const verb = isCapture ? "captures on" : "plays";
+  let msg = `${side} ${verb} ${file}${rank}`;
+  if (status === "checkmate") msg += " — Checkmate!";
+  else if (status === "check") msg += " — Check";
+  else if (status === "stalemate") msg = "Stalemate — Draw";
+  return msg;
+}
 
 /** Produce a short algebraic label for a move (no disambiguation). */
 function moveLabel(board, move) {
@@ -62,6 +82,9 @@ export default function GamePage() {
   // Right-panel tab
   const [activeTab, setActiveTab] = useState("analysis");
 
+  // Aria live announcement region
+  const [ariaMsg, setAriaMsg] = useState("");
+
   // Analysis result for the currently viewed position
   const [analysis, setAnalysis] = useState(null);
 
@@ -85,6 +108,7 @@ export default function GamePage() {
     getStockfishMove(liveBoard, "b", engineRating).then((move) => {
       if (cancelled || requestId !== moveRequestId.current || !move) return;
 
+      const isCapture = Boolean(liveBoard[move.tr][move.tc]);
       const notation = moveLabel(liveBoard, move);
       const { board: nextBoard, gameState: nextGS } = applyMoveWithRules(liveBoard, move, liveGS);
       const nextStatus = getGameStatus(nextBoard, "w", nextGS);
@@ -92,6 +116,13 @@ export default function GamePage() {
         board: nextBoard, gameState: nextGS, turn: "w", status: nextStatus,
         lastFrom: { r: move.r, c: move.c }, lastTo: { r: move.tr, c: move.tc },
       };
+
+      // Sound + screen-reader announcement
+      if (nextStatus === "checkmate") playCheckmate();
+      else if (nextStatus === "check") playCheck();
+      else if (isCapture) playCapture();
+      else playMove();
+      setAriaMsg(buildAnnouncement(move.tr, move.tc, isCapture, nextStatus, "Black"));
 
       setBoardHistory(prev => {
         const updated = [...prev, nextState];
@@ -124,21 +155,58 @@ export default function GamePage() {
     setSelected(null);
     setMovesFromSquare([]);
     setAnalysis(null);
+    setAriaMsg("Game reset");
+    playGameStart();
   }, []);
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   const goToMove = useCallback((idx, histLen) => {
     const len = histLen ?? boardHistory.length;
     const clamped = Math.max(0, Math.min(len - 1, idx));
-    setViewIdx(clamped);
+    setViewIdx(prev => {
+      if (clamped !== prev) {
+        playNavStep();
+        if (clamped === 0) setAriaMsg("Start position");
+        else if (clamped === len - 1) setAriaMsg("Live position");
+        else setAriaMsg(`Move ${clamped} of ${len - 1}`);
+      }
+      return clamped;
+    });
     setSelected(null);
     setMovesFromSquare([]);
   }, [boardHistory.length]);
 
   useEffect(() => {
     function onKey(e) {
-      if (e.key === "ArrowLeft")  setViewIdx(v => Math.max(0, v - 1));
-      if (e.key === "ArrowRight") setViewIdx(v => Math.min(boardHistory.length - 1, v + 1));
+      const last = boardHistory.length - 1;
+      if (e.key === "ArrowLeft") {
+        setViewIdx(v => {
+          if (v <= 0) return v;
+          playNavStep();
+          setAriaMsg(v - 1 === 0 ? "Start position" : `Move ${v - 1} of ${last}`);
+          return v - 1;
+        });
+      }
+      if (e.key === "ArrowRight") {
+        setViewIdx(v => {
+          if (v >= last) return v;
+          playNavStep();
+          setAriaMsg(v + 1 >= last ? "Live position" : `Move ${v + 1} of ${last}`);
+          return v + 1;
+        });
+      }
+      if (e.key === "Home") {
+        setViewIdx(v => {
+          if (v === 0) return v;
+          playNavStep(); setAriaMsg("Start position"); return 0;
+        });
+      }
+      if (e.key === "End") {
+        setViewIdx(v => {
+          if (v === last) return v;
+          playNavStep(); setAriaMsg("Live position"); return last;
+        });
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -151,6 +219,7 @@ export default function GamePage() {
 
     const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
     if (selected && chosenMove) {
+      const isCapture = Boolean(liveBoard[chosenMove.tr][chosenMove.tc]);
       const notation = moveLabel(liveBoard, chosenMove);
       const { board: nextBoard, gameState: nextGS } = applyMoveWithRules(liveBoard, chosenMove, liveGS);
       const nextStatus = getGameStatus(nextBoard, "b", nextGS);
@@ -158,6 +227,14 @@ export default function GamePage() {
         board: nextBoard, gameState: nextGS, turn: "b", status: nextStatus,
         lastFrom: { r: chosenMove.r, c: chosenMove.c }, lastTo: { r: chosenMove.tr, c: chosenMove.tc },
       };
+
+      // Sound + screen-reader announcement
+      if (nextStatus === "checkmate") playCheckmate();
+      else if (nextStatus === "check") playCheck();
+      else if (isCapture) playCapture();
+      else playMove();
+      setAriaMsg(buildAnnouncement(chosenMove.tr, chosenMove.tc, isCapture, nextStatus, "White"));
+
       setBoardHistory(prev => {
         const updated = [...prev, nextState];
         setViewIdx(updated.length - 1);
@@ -170,7 +247,10 @@ export default function GamePage() {
     }
 
     const piece = liveBoard[r][c];
-    if (!piece || piece[0] !== "w") { setSelected(null); setMovesFromSquare([]); return; }
+    if (!piece || piece[0] !== "w") {
+      if (selected) playIllegal();
+      setSelected(null); setMovesFromSquare([]); return;
+    }
     setSelected([r, c]);
     setMovesFromSquare(getLegalMovesWithRules(liveBoard, r, c, liveGS));
   }
@@ -251,6 +331,9 @@ export default function GamePage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="lc-page">
+      {/* Screen-reader live region */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">{ariaMsg}</div>
+
       {/* ── Board section ── */}
       <div className="lc-board-section">
         {/* Black player label */}

@@ -95,7 +95,7 @@ test("applyLocalMove promotes pawns to queens", () => {
 });
 
 test("OPENINGS have consistent move/position progression and valid board shapes", () => {
-  assert.equal(OPENINGS.length, 4);
+  assert.equal(OPENINGS.length, 6);
   for (const opening of OPENINGS) {
     assert.equal(opening.positions.length, opening.moves.length + 1);
     for (const position of opening.positions) {
