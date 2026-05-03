@@ -246,6 +246,52 @@ function applyWeakness(bestMove, allMoves, rating) {
   return bestMove;
 }
 
+// ── Legality guard ───────────────────────────────────────────────────────────
+
+/**
+ * Returns true if applying `move` for `side` does *not* leave that side's own
+ * king in check.  This is the only thing that distinguishes a pseudo-legal
+ * move from a fully legal one — moving a pinned piece off the pin, or a king
+ * walking into an attacked square, both fail this test.
+ *
+ * @param {(string|null)[][]} board
+ * @param {{ r:number, c:number, tr:number, tc:number }} move
+ * @param {"w"|"b"} side
+ * @param {object} [gameState]
+ * @returns {boolean}
+ */
+function isMoveStrictlyLegal(board, move, gameState) {
+  if (!move || !gameState) return false;
+  // Use the rules-aware applier so castling / en-passant move flags are
+  // honoured; it returns `illegal: true` when the resulting position would
+  // leave the moving side in check, which is exactly the legality criterion.
+  const result = applyMoveWithRules(board, move, gameState);
+  return !result.illegal;
+}
+
+/**
+ * Guarantees a legal return move.  If `move` is legal, returns it unchanged;
+ * otherwise picks the first move from `legalMoves` (which the caller must have
+ * produced via `getAllLegalMoves`) so the engine layer can never return an
+ * illegal move regardless of API output, randomness, or future bugs in the
+ * move-selection pipeline.
+ *
+ * When no `gameState` is available (older code paths), legality cannot be
+ * verified strictly, so the move is returned as-is — those paths already
+ * relied on pseudo-legal moves and are not made worse by this helper.
+ *
+ * @param {{ r:number, c:number, tr:number, tc:number }} move
+ * @param {{ r:number, c:number, tr:number, tc:number }[]} legalMoves
+ * @param {(string|null)[][]} board
+ * @param {object} [gameState]
+ * @returns {{ r:number, c:number, tr:number, tc:number }|null}
+ */
+function ensureLegal(move, legalMoves, board, gameState) {
+  if (!gameState) return move ?? (legalMoves.length > 0 ? legalMoves[0] : null);
+  if (move && isMoveStrictlyLegal(board, move, gameState)) return move;
+  return legalMoves.length > 0 ? legalMoves[0] : null;
+}
+
 // ── Local fallback engine ────────────────────────────────────────────────────
 
 /**
@@ -267,9 +313,14 @@ function localEngineFallback(board, side, gameState) {
   let bestScore = -Infinity;
 
   for (const move of moves) {
-    const nextBoard = gameState
-      ? applyMoveWithRules(board, move, gameState).board
-      : applyBoardMove(board, move);
+    let nextBoard;
+    if (gameState) {
+      const applied = applyMoveWithRules(board, move, gameState);
+      if (applied.illegal) continue;
+      nextBoard = applied.board;
+    } else {
+      nextBoard = applyBoardMove(board, move);
+    }
     const raw = evaluateBoard(nextBoard);
     const score = side === "w" ? raw : -raw;
     if (score > bestScore) {
@@ -278,9 +329,13 @@ function localEngineFallback(board, side, gameState) {
     }
   }
 
-  const evalBoard = gameState
-    ? applyMoveWithRules(board, bestMove, gameState).board
-    : applyBoardMove(board, bestMove);
+  let evalBoard;
+  if (gameState) {
+    const applied = applyMoveWithRules(board, bestMove, gameState);
+    evalBoard = applied.illegal ? board : applied.board;
+  } else {
+    evalBoard = applyBoardMove(board, bestMove);
+  }
 
   return {
     ...bestMove,
@@ -325,7 +380,11 @@ export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATI
       m.tr === parsedMove.tr && m.tc === parsedMove.tc
     ) || allMoves[0];
 
-    const finalMove = applyWeakness(bestMove, allMoves, rating);
+    const finalMove = ensureLegal(
+      applyWeakness(bestMove, allMoves, rating),
+      allMoves, board, gameState,
+    );
+    if (!finalMove) return null;
 
     // Use the API evaluation when playing the best move; otherwise recompute.
     const evaluation =
@@ -339,7 +398,11 @@ export async function getStockfishMove(board, side, rating = DEFAULT_ENGINE_RATI
     const fallback = localEngineFallback(board, side, gameState);
     if (!fallback) return null;
 
-    const finalMove = applyWeakness(fallback, allMoves, rating);
+    const finalMove = ensureLegal(
+      applyWeakness(fallback, allMoves, rating),
+      allMoves, board, gameState,
+    );
+    if (!finalMove) return null;
     const evaluation = evaluateBoard(applyBoardMove(board, finalMove));
 
     return { ...finalMove, evaluation, source: "local" };
@@ -369,10 +432,14 @@ export async function getStockfishAnalysis(board, side, gameState) {
     const parsedMove = parseUCIMove(result.bestmove);
 
     // Match against legal moves for proper flags
-    const move = allMoves.find(m =>
-      m.r === parsedMove.r && m.c === parsedMove.c &&
-      m.tr === parsedMove.tr && m.tc === parsedMove.tc
-    ) || allMoves[0];
+    const move = ensureLegal(
+      allMoves.find(m =>
+        m.r === parsedMove.r && m.c === parsedMove.c &&
+        m.tr === parsedMove.tr && m.tc === parsedMove.tc
+      ) || allMoves[0],
+      allMoves, board, gameState,
+    );
+    if (!move) return null;
 
     return {
       move,
