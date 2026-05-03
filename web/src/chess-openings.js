@@ -380,6 +380,136 @@ const kidFianchetto = buildLine(
   "Fianchetto Variation — 3.g3, White's quiet system trying to neutralise the KID bishop.",
 );
 
+// ── Spanish Opening (Ruy Lopez) ─────────────────────────────────────────────
+const spanishMain = buildLine(
+  [
+    { san: "e4", m: mv("e2", "e4"), annotation: "1. e4 — Controls the center, opens lines for the bishop and queen.", highlight: [[4, 4]] },
+    { san: "e5", m: mv("e7", "e5"), annotation: "1...e5 — Black mirrors, contesting the center.", highlight: [[3, 4]] },
+    { san: "Nf3", m: mv("g1", "f3"), annotation: "2. Nf3 — Develops with tempo, attacking the e5 pawn.", highlight: [[5, 5]] },
+    { san: "Nc6", m: mv("b8", "c6"), annotation: "2...Nc6 — Defends e5 and develops toward the center.", highlight: [[2, 2]] },
+    { san: "Bb5", m: mv("f1", "b5"), annotation: "3. Bb5 — The Ruy Lopez! The bishop pins the knight, pressuring the e5 pawn indirectly.", highlight: [[3, 1]] },
+    { san: "a6", m: mv("a7", "a6"), annotation: "3...a6 — The Morphy Defense, the most popular reply. Black asks: will you exchange on c6?", highlight: [[2, 0]] },
+    { san: "Ba4", m: mv("b5", "a4"), annotation: "4. Ba4 — White retreats, keeping the pin alive rather than exchanging.", highlight: [[4, 0]] },
+    { san: "Nf6", m: mv("g8", "f6"), annotation: "4...Nf6 — Development with a direct attack on e4.", highlight: [[2, 5]] },
+    { san: "O-O", m: castle("w", "K"), annotation: "5. O-O — White castles, ignoring the e4 threat — the Open Spanish 5...Nxe4 is complex but fine for Black.", highlight: [[7, 6]] },
+    { san: "Be7", m: mv("f8", "e7"), annotation: "5...Be7 — The Closed Ruy Lopez. Black develops quietly, aiming to castle and then fight for the center with ...b5 and ...d6.", highlight: [[1, 4]] },
+    { san: "Re1", m: mv("f1", "e1"), annotation: "6. Re1 — The rook defends e4 and prepares the Bf1 maneuver.", highlight: [[7, 4]] },
+    { san: "b5", m: mv("b7", "b5"), annotation: "6...b5 — Kicks the bishop away from a4.", highlight: [[3, 1]] },
+    { san: "Bb3", m: mv("a4", "b3"), annotation: "7. Bb3 — The bishop retreats to a strong diagonal, still eyeing d5 and f7.", highlight: [[5, 1]] },
+    { san: "d6", m: mv("d7", "d6"), annotation: "7...d6 — Solidifies the center. The main Closed Spanish tabiya: c3, h3, d4, Nbd2 follows for White — one of the richest strategic positions in all of chess.", highlight: [[2, 3]] },
+  ],
+  "The starting position. White prepares the Ruy Lopez — one of the most deeply analysed openings in history.",
+);
+const spanishBerlin = buildLine(
+  [
+    { san: "e4", m: mv("e2", "e4"), annotation: "1. e4", highlight: [[4, 4]] },
+    { san: "e5", m: mv("e7", "e5"), annotation: "1...e5", highlight: [[3, 4]] },
+    { san: "Nf3", m: mv("g1", "f3"), annotation: "2. Nf3", highlight: [[5, 5]] },
+    { san: "Nc6", m: mv("b8", "c6"), annotation: "2...Nc6", highlight: [[2, 2]] },
+    { san: "Bb5", m: mv("f1", "b5"), annotation: "3. Bb5", highlight: [[3, 1]] },
+    { san: "Nf6", m: mv("g8", "f6"), annotation: "3...Nf6 — The Berlin Defense! Instead of 3...a6, Black immediately counterattacks e4.", highlight: [[2, 5]] },
+    { san: "O-O", m: castle("w", "K"), annotation: "4. O-O — White castles into safety.", highlight: [[7, 6]] },
+    { san: "Nxe4", m: mv("f6", "e4"), annotation: "4...Nxe4 — Black wins the e4 pawn, the point of the Berlin.", highlight: [[4, 4]] },
+    { san: "d4", m: mv("d2", "d4"), annotation: "5. d4 — White strikes the center to regain the pawn.", highlight: [[4, 3]] },
+    { san: "Nd6", m: mv("e4", "d6"), annotation: "5...Nd6 — The knight retreats, forcing Bb5 away or allowing its exchange.", highlight: [[2, 3]] },
+    { san: "Bxc6", m: mv("b5", "c6"), annotation: "6. Bxc6 — White captures, doubling Black's pawns to gain activity.", highlight: [[2, 2]] },
+    { san: "dxc6", m: mv("d7", "c6"), annotation: "6...dxc6 — Black recaptures, opening the d-file but creating doubled c-pawns.", highlight: [[2, 2]] },
+    { san: "dxe5", m: mv("d4", "e5"), annotation: "7. dxe5 — White regains the pawn with a space advantage.", highlight: [[3, 4]] },
+    { san: "Nf5", m: mv("d6", "f5"), annotation: "7...Nf5 — The knight heads to a strong outpost. White's queen will trade on d8 leading to the famous Berlin Endgame — a monument of modern defensive technique popularised by Kramnik.", highlight: [[3, 5]] },
+  ],
+  "Berlin Defense — 3...Nf6, Black's ultra-solid reply that frustrated Kasparov in the 2000 World Championship.",
+);
+const spanishExchange = buildLine(
+  [
+    { san: "e4", m: mv("e2", "e4"), annotation: "1. e4", highlight: [[4, 4]] },
+    { san: "e5", m: mv("e7", "e5"), annotation: "1...e5", highlight: [[3, 4]] },
+    { san: "Nf3", m: mv("g1", "f3"), annotation: "2. Nf3", highlight: [[5, 5]] },
+    { san: "Nc6", m: mv("b8", "c6"), annotation: "2...Nc6", highlight: [[2, 2]] },
+    { san: "Bb5", m: mv("f1", "b5"), annotation: "3. Bb5", highlight: [[3, 1]] },
+    { san: "a6", m: mv("a7", "a6"), annotation: "3...a6 — Morphy Defense.", highlight: [[2, 0]] },
+    { san: "Bxc6", m: mv("b5", "c6"), annotation: "4. Bxc6 — The Exchange Variation! White gives up the bishop pair to create Black's structural weakness: doubled c-pawns.", highlight: [[2, 2]] },
+    { san: "dxc6", m: mv("d7", "c6"), annotation: "4...dxc6 — Black recaptures. The pawns are ugly but Black gains the bishop pair and extra central control.", highlight: [[2, 2]] },
+    { san: "O-O", m: castle("w", "K"), annotation: "5. O-O — White castles first.", highlight: [[7, 6]] },
+    { san: "f6", m: mv("f7", "f6"), annotation: "5...f6 — Black reinforces e5 and prepares ...Bg4 or ...Be6.", highlight: [[2, 5]] },
+    { san: "d4", m: mv("d2", "d4"), annotation: "6. d4 — White hits the center.", highlight: [[4, 3]] },
+    { san: "Bg4", m: mv("c8", "g4"), annotation: "6...Bg4 — Black's free bishop pins the knight, seeking active counterplay.", highlight: [[4, 6]] },
+    { san: "c3", m: mv("c2", "c3"), annotation: "7. c3 — Supports d4 and prepares Nbd2.", highlight: [[5, 2]] },
+    { san: "Qd6", m: mv("d8", "d6"), annotation: "7...Qd6 — Centralises the queen, eyes d4 and prepares queenside castling. White has the long-term structural advantage; Black's two bishops provide enough counterplay.", highlight: [[2, 3]] },
+  ],
+  "Exchange Variation — 4.Bxc6, the practical favourite: White creates Black's structural weakness immediately.",
+);
+
+// ── Sicilian Defense ─────────────────────────────────────────────────────────
+const sicilianMain = buildLine(
+  [
+    { san: "e4", m: mv("e2", "e4"), annotation: "1. e4", highlight: [[4, 4]] },
+    { san: "c5", m: mv("c7", "c5"), annotation: "1...c5 — The Sicilian! Black avoids ...e5 symmetry, preparing an asymmetric battle — the most popular defense against 1.e4 at all levels.", highlight: [[3, 2]] },
+    { san: "Nf3", m: mv("g1", "f3"), annotation: "2. Nf3 — The most common, leading to the Open Sicilian after d4.", highlight: [[5, 5]] },
+    { san: "d6", m: mv("d7", "d6"), annotation: "2...d6 — Najdorf move order: prepares ...Nf6 and controls e5.", highlight: [[2, 3]] },
+    { san: "d4", m: mv("d2", "d4"), annotation: "3. d4 — The Open Sicilian. White grabs the center; the game will be dynamic and imbalanced.", highlight: [[4, 3]] },
+    { san: "cxd4", m: mv("c5", "d4"), annotation: "3...cxd4 — Black trades the c-pawn for White's d-pawn, the hallmark of the Sicilian.", highlight: [[4, 3]] },
+    { san: "Nxd4", m: mv("f3", "d4"), annotation: "4. Nxd4 — White recaptures with the knight.", highlight: [[4, 3]] },
+    { san: "Nf6", m: mv("g8", "f6"), annotation: "4...Nf6 — Develops and attacks e4.", highlight: [[2, 5]] },
+    { san: "Nc3", m: mv("b1", "c3"), annotation: "5. Nc3 — Defends e4 and develops.", highlight: [[5, 2]] },
+    { san: "a6", m: mv("a7", "a6"), annotation: "5...a6 — The Najdorf Variation! Prevents Nb5 and Bb5+, preparing ...e5 or ...b5. Fischer and Kasparov's favourite — the most popular and deeply analysed variation in all of chess.", highlight: [[2, 0]] },
+    { san: "Be3", m: mv("c1", "e3"), annotation: "6. Be3 — The English Attack setup.", highlight: [[5, 4]] },
+    { san: "e5", m: mv("e7", "e5"), annotation: "6...e5 — Black grabs space and drives the d4 knight away. The Modern Najdorf main line.", highlight: [[3, 4]] },
+    { san: "Nb3", m: mv("d4", "b3"), annotation: "7. Nb3 — Knight retreats to a solid square, eyeing c5 and d4.", highlight: [[5, 1]] },
+    { san: "Be7", m: mv("f8", "e7"), annotation: "7...Be7 — Solid development, preparing kingside castling.", highlight: [[1, 4]] },
+    { san: "f3", m: mv("f2", "f3"), annotation: "8. f3 — Supports e4 and prepares g4-g5 or the Qd2/O-O-O attack.", highlight: [[5, 5]] },
+    { san: "O-O", m: castle("b", "K"), annotation: "8...O-O — Black castles into relative safety.", highlight: [[0, 6]] },
+    { san: "Qd2", m: mv("d1", "d2"), annotation: "9. Qd2 — Prepares O-O-O and a kingside pawn storm with g4.", highlight: [[6, 3]] },
+    { san: "Be6", m: mv("c8", "e6"), annotation: "9...Be6 — Activates the bishop, contesting d5 and b3. The critical position of the Modern Najdorf — both sides castle on opposite wings and attack.", highlight: [[2, 4]] },
+  ],
+  "Starting position. The Sicilian Defense — Black's most combative answer to 1.e4.",
+);
+const sicilianDragon = buildLine(
+  [
+    { san: "e4", m: mv("e2", "e4"), annotation: "1. e4", highlight: [[4, 4]] },
+    { san: "c5", m: mv("c7", "c5"), annotation: "1...c5 — Sicilian Defense.", highlight: [[3, 2]] },
+    { san: "Nf3", m: mv("g1", "f3"), annotation: "2. Nf3", highlight: [[5, 5]] },
+    { san: "d6", m: mv("d7", "d6"), annotation: "2...d6", highlight: [[2, 3]] },
+    { san: "d4", m: mv("d2", "d4"), annotation: "3. d4", highlight: [[4, 3]] },
+    { san: "cxd4", m: mv("c5", "d4"), annotation: "3...cxd4", highlight: [[4, 3]] },
+    { san: "Nxd4", m: mv("f3", "d4"), annotation: "4. Nxd4", highlight: [[4, 3]] },
+    { san: "Nf6", m: mv("g8", "f6"), annotation: "4...Nf6", highlight: [[2, 5]] },
+    { san: "Nc3", m: mv("b1", "c3"), annotation: "5. Nc3", highlight: [[5, 2]] },
+    { san: "g6", m: mv("g7", "g6"), annotation: "5...g6 — The Dragon Variation! Black fianchettoes the bishop for lasting diagonal pressure.", highlight: [[2, 6]] },
+    { san: "Be3", m: mv("c1", "e3"), annotation: "6. Be3 — The Yugoslav Attack setup — the sharpest system against the Dragon.", highlight: [[5, 4]] },
+    { san: "Bg7", m: mv("f8", "g7"), annotation: "6...Bg7 — The Dragon bishop — the soul of the variation, dominating the long diagonal.", highlight: [[1, 6]] },
+    { san: "f3", m: mv("f2", "f3"), annotation: "7. f3 — Prevents ...Ng4 hitting Be3 and prepares the queenside castle with Qd2.", highlight: [[5, 5]] },
+    { san: "O-O", m: castle("b", "K"), annotation: "7...O-O — Black castles, activating the Dragon bishop.", highlight: [[0, 6]] },
+    { san: "Qd2", m: mv("d1", "d2"), annotation: "8. Qd2 — Connects rooks and aims at h6.", highlight: [[6, 3]] },
+    { san: "Nc6", m: mv("b8", "c6"), annotation: "8...Nc6 — Pressures d4 and prepares queenside counterplay.", highlight: [[2, 2]] },
+    { san: "Bc4", m: mv("f1", "c4"), annotation: "9. Bc4 — Points at f7, the key Yugoslav Attack weapon.", highlight: [[4, 2]] },
+    { san: "Bd7", m: mv("c8", "d7"), annotation: "9...Bd7 — Prepares ...Rc8 and links the rooks. The position is razor-sharp: White will castle queenside and launch h4-h5, Black counterattacks on the c-file — both sides must play with maximum precision.", highlight: [[1, 3]] },
+  ],
+  "Dragon Variation — 5...g6, fianchettoing the bishop for the most explosive battles in the Sicilian.",
+);
+const sicilianClosed = buildLine(
+  [
+    { san: "e4", m: mv("e2", "e4"), annotation: "1. e4", highlight: [[4, 4]] },
+    { san: "c5", m: mv("c7", "c5"), annotation: "1...c5 — Sicilian Defense.", highlight: [[3, 2]] },
+    { san: "Nc3", m: mv("b1", "c3"), annotation: "2. Nc3 — The Closed Sicilian! White avoids Open Sicilian theory and builds up quietly.", highlight: [[5, 2]] },
+    { san: "Nc6", m: mv("b8", "c6"), annotation: "2...Nc6 — Mirrors the knight, fighting for central control.", highlight: [[2, 2]] },
+    { san: "g3", m: mv("g2", "g3"), annotation: "3. g3 — Prepares the kingside fianchetto.", highlight: [[5, 6]] },
+    { san: "g6", m: mv("g7", "g6"), annotation: "3...g6 — Black mirrors with a fianchetto of their own.", highlight: [[2, 6]] },
+    { san: "Bg2", m: mv("f1", "g2"), annotation: "4. Bg2 — White's bishop eyes d5 and the long diagonal.", highlight: [[6, 6]] },
+    { san: "Bg7", m: mv("f8", "g7"), annotation: "4...Bg7 — The two bishops on the long diagonal create a tense standoff.", highlight: [[1, 6]] },
+    { san: "d3", m: mv("d2", "d3"), annotation: "5. d3 — Solid central support.", highlight: [[5, 3]] },
+    { san: "d6", m: mv("d7", "d6"), annotation: "5...d6 — Mirrors the structure.", highlight: [[2, 3]] },
+    { san: "f4", m: mv("f2", "f4"), annotation: "6. f4 — The thematic Closed Sicilian pawn advance, seizing kingside space.", highlight: [[4, 5]] },
+    { san: "e6", m: mv("e7", "e6"), annotation: "6...e6 — Solid, preparing ...Nge7 and castling.", highlight: [[2, 4]] },
+    { san: "Nf3", m: mv("g1", "f3"), annotation: "7. Nf3 — Completes development.", highlight: [[5, 5]] },
+    { san: "Nge7", m: mv("g8", "e7"), annotation: "7...Nge7 — The flexible knight goes to e7, supporting d5 and f5.", highlight: [[1, 4]] },
+    { san: "O-O", m: castle("w", "K"), annotation: "8. O-O — White castles short.", highlight: [[7, 6]] },
+    { san: "O-O", m: castle("b", "K"), annotation: "8...O-O — Black castles too. Both sides develop in mirror fashion — the ensuing manoeuvring game suits positional players.", highlight: [[0, 6]] },
+    { san: "Be3", m: mv("c1", "e3"), annotation: "9. Be3 — Activates the bishop and prepares a central fight.", highlight: [[5, 4]] },
+    { san: "Nd4", m: mv("c6", "d4"), annotation: "9...Nd4 — Black seizes the key outpost in the center. The Closed Sicilian offers rich positional play without the sharp theory of the Open Sicilian.", highlight: [[4, 3]] },
+  ],
+  "Closed Sicilian — 2.Nc3, White avoids Open Sicilian theory for a steady kingside build-up.",
+);
+
 // ── Opening definitions ─────────────────────────────────────────────────────
 export const OPENINGS = [
   {
@@ -410,6 +540,19 @@ export const OPENINGS = [
     ],
   },
   {
+    id: "spanish", name: "Spanish Opening", color: "blue",
+    tags: ["Opening", "Classic"],
+    diff: 2, side: "White",
+    desc: "The oldest and most thoroughly analysed of all open-game openings. White pins the c6 knight, pressuring the e5 pawn and fighting for long-term positional advantages.",
+    moves: spanishMain.moves,
+    positions: spanishMain.positions,
+    ideas: ["Pin the Nc6 with Bb5 to pressure e5 indirectly", "Retreat Ba4 after ...a6 to maintain the pin", "Castle kingside with O-O and reinforce e4 with Re1", "Achieve the d4 break for central dominance"],
+    variations: [
+      { id: "spanish-berlin", name: "Berlin Defense", desc: "3...Nf6 — Black counterattacks immediately, leading to the ultra-solid Berlin Endgame popularised by Kramnik at the 2000 World Championship.", moves: spanishBerlin.moves, positions: spanishBerlin.positions },
+      { id: "spanish-exchange", name: "Exchange Variation", desc: "4.Bxc6 — White trades the bishop pair to create Black's structural weakness (doubled c-pawns), a practical favourite at club level.", moves: spanishExchange.moves, positions: spanishExchange.positions },
+    ],
+  },
+  {
     id: "carokann", name: "Caro-Kann Defense", color: "red",
     tags: ["Opening", "Solid", "Black"],
     diff: 2, side: "Black",
@@ -421,6 +564,19 @@ export const OPENINGS = [
       { id: "caro-classical", name: "Classical Variation", desc: "The 4...Bf5 mainline through the Capablanca / Karpov tabiya after 10.Qxd3.", moves: caroClassical.moves, positions: caroClassical.positions },
       { id: "caro-advance", name: "Advance Variation", desc: "White grabs space with 3.e5; Black develops the bishop before locking it in. Modern theory considered very testing for both sides.", moves: caroAdvance.moves, positions: caroAdvance.positions },
       { id: "caro-exchange", name: "Exchange Variation", desc: "3.exd5 cxd5 leads to a Carlsbad-like symmetrical structure where White hopes for a slight pull.", moves: caroExchange.moves, positions: caroExchange.positions },
+    ],
+  },
+  {
+    id: "sicilian", name: "Sicilian Defense", color: "purple",
+    tags: ["Opening", "Dynamic", "Black"],
+    diff: 3, side: "Black",
+    desc: "The most popular defense to 1.e4. Black avoids symmetry, creating an asymmetric position with rich imbalances. Leads to the sharpest, most complex battles in chess.",
+    moves: sicilianMain.moves,
+    positions: sicilianMain.positions,
+    ideas: ["Trade c-pawn for White's d-pawn with ...cxd4", "Create queenside counterplay with ...b5 and ...a5", "Use the half-open c-file for rook pressure", "Najdorf: play ...a6 to prevent Nb5 and prepare ...e5 or ...b5"],
+    variations: [
+      { id: "sicilian-dragon", name: "Dragon Variation", desc: "5...g6 — Black fianchettoes the bishop for devastating long-diagonal pressure. The most explosive variation in the Sicilian.", moves: sicilianDragon.moves, positions: sicilianDragon.positions },
+      { id: "sicilian-closed", name: "Closed Sicilian", desc: "2.Nc3 — White avoids Open Sicilian theory entirely, choosing a slow kingside build-up with g3, Bg2, and f4.", moves: sicilianClosed.moves, positions: sicilianClosed.positions },
     ],
   },
   {
