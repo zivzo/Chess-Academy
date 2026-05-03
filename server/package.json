@@ -1,0 +1,20 @@
+{
+  "name": "chess-academy-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie": "^1.0.2",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.4.1",
+    "lowdb": "^7.0.1",
+    "ws": "^8.18.0"
+  }
+}

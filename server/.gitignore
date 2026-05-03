@@ -1,0 +1,10 @@
+# Server data
+db.json
+db.json.bak.*
+sessions/
+
+# Logs
+*.log
+
+# Dependencies
+node_modules
