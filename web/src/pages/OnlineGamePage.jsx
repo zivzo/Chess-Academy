@@ -1,7 +1,6 @@
 // ── Online live game — clocks, drag/click moves, resign/draw, chat ─────────
 import { useEffect, useMemo, useRef, useState } from "react";
 import { sendWs, useWsMessages, useWsConnection } from "../utils/wsClient.js";
-import { useAuth } from "../utils/useAuth.js";
 import { fenToBoard, formatTimeMs, moveToUci } from "../utils/chessFen.js";
 import { getLegalMovesWithRules, applyMoveWithRules, createGameState, START } from "../chess-core.js";
 import {
@@ -42,8 +41,6 @@ function uciToLegalMove(board, gs, turn, uci) {
 }
 
 export default function OnlineGamePage({ initialGame, onAnalyze, onLeave }) {
-  // eslint-disable-next-line no-unused-vars
-  const { user: _user } = useAuth();
   const connState = useWsConnection();
   const [game, setGame] = useState(initialGame);
   const [chat, setChat] = useState([]);

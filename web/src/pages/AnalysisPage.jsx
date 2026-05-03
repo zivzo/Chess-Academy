@@ -22,10 +22,6 @@ function evalToY(evalCp, mate) {
 
 export default function AnalysisPage({ gameId, onBack }) {
   const [game, setGame] = useState(null);
-  // Persisted analysis row from the server (used to seed initial notes).
-  // Kept around as a marker for "loaded".
-  // eslint-disable-next-line no-unused-vars
-  const [analysis, setAnalysis] = useState(null); // { gameId, summary, notes:[] }
   const [error, setError] = useState(null);
   const [ply, setPly] = useState(0); // 0 = start position, k = after k half-moves
   const [evalByPly, setEvalByPly] = useState({});
@@ -44,7 +40,6 @@ export default function AnalysisPage({ gameId, onBack }) {
       .then(([g, a]) => {
         if (cancelled) return;
         setGame(g.game);
-        setAnalysis(a.analysis);
         setSummary(a.analysis?.summary || "");
         const map = {};
         for (const n of a.analysis?.notes || []) map[n.ply] = n.comment || "";
@@ -105,7 +100,8 @@ export default function AnalysisPage({ gameId, onBack }) {
           .filter(([, v]) => (v ?? "").trim() !== "")
           .map(([k, v]) => ({ ply: Number(k), comment: v }));
         const r = await api.put(`/api/analyses/${gameId}`, { summary: nextSummary, notes });
-        setAnalysis(r.analysis);
+        // eslint-disable-next-line no-unused-vars
+        const _saved = r.analysis;
         setSavedAt(new Date());
       } catch {
         // ignore — the user can retry by editing again

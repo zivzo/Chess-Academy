@@ -21,7 +21,7 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import http from "node:http";
-import { attachUser, authRouter } from "./auth.js";
+import { attachUser, authRouter, requireSameOrigin } from "./auth.js";
 import { gamesRouter, analysesRouter } from "./games.js";
 import { attachWebSocketServer } from "./online.js";
 import { getDb } from "./db.js";
@@ -33,6 +33,15 @@ const app = express();
 app.use(express.json({ limit: "256kb" }));
 app.use(cookieParser());
 app.use(attachUser);
+
+// CSRF guard: for any state-changing request that carries a browser-supplied
+// Origin/Referer, require it to match this server's host (or ALLOWED_ORIGIN).
+// GET requests, and tools without an Origin/Referer (curl, server-to-server),
+// are unaffected.
+app.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return next();
+  return requireSameOrigin(req, res, next);
+});
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 app.use("/api/auth", authRouter);

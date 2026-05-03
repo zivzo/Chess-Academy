@@ -15,7 +15,11 @@ export function squareName(r, c) {
 export function moveToUci(move) {
   const from = squareName(move.r, move.c);
   const to = squareName(move.tr, move.tc);
-  const promo = move.promotion ? "q" : "";
+  let promo = "";
+  if (move.promotion) {
+    const p = typeof move.promotion === "string" ? move.promotion.toLowerCase() : "q";
+    promo = "qrbn".includes(p) ? p : "q";
+  }
   return `${from}${to}${promo}`;
 }
 

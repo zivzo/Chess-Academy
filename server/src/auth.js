@@ -4,6 +4,9 @@
 // - Sessions are server-side: an opaque random session id is stored in an
 //   httpOnly cookie and mapped to a user via the `sessions` collection.
 // - Login + register are rate-limited to slow brute force.
+// - All cookie-authenticated mutating routes are protected by a same-origin
+//   check (`requireSameOrigin`). Combined with `sameSite=lax` cookies, this
+//   provides CSRF protection for our first-party-only auth flow.
 
 import express from "express";
 import bcrypt from "bcrypt";
@@ -14,6 +17,12 @@ import { getDb, persist, newId } from "./db.js";
 const BCRYPT_COST = 12;
 const SESSION_COOKIE = "ca_sid";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+// Hard caps applied *before* regex matching to avoid catastrophic backtracking
+// (defense in depth on top of express.json's body limit).
+const MAX_USERNAME_LEN = 24;
+const MAX_EMAIL_LEN = 254;          // RFC 5321 limit
+const MAX_PASSWORD_LEN = 200;
 
 const USERNAME_RE = /^[a-zA-Z0-9_-]{3,24}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -58,6 +67,27 @@ export function requireAuth(req, res, next) {
   next();
 }
 
+// CSRF defence-in-depth on top of `sameSite=lax` cookies. For state-changing
+// requests, require either a same-origin `Origin`/`Referer` header (the
+// browser sends one automatically for all cross-origin fetches) or no
+// `Origin`/`Referer` at all (curl, Node clients — they don't carry our
+// cookies in the wild without explicit user action).
+export function requireSameOrigin(req, res, next) {
+  const allowed = process.env.ALLOWED_ORIGIN; // e.g. "https://chess-academy.example.com"
+  const host = req.headers["host"];
+  const origin = req.headers["origin"];
+  const referer = req.headers["referer"];
+  const source = origin || referer;
+  if (!source) return next(); // no browser-supplied origin → not a CSRF vector
+  let url;
+  try { url = new URL(source); } catch { return res.status(403).json({ error: "bad_origin" }); }
+  // Allow requests whose Origin/Referer host matches the request host (proxy
+  // or direct), or matches an explicit ALLOWED_ORIGIN env var.
+  if (host && url.host === host) return next();
+  if (allowed && source.startsWith(allowed)) return next();
+  return res.status(403).json({ error: "csrf_blocked" });
+}
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 30,
@@ -97,13 +127,13 @@ export const authRouter = express.Router();
 
 authRouter.post("/register", authLimiter, async (req, res) => {
   const { username, email, password } = req.body || {};
-  if (!username || !USERNAME_RE.test(username)) {
+  if (typeof username !== "string" || username.length > MAX_USERNAME_LEN || !USERNAME_RE.test(username)) {
     return res.status(400).json({ error: "invalid_username" });
   }
-  if (!email || !EMAIL_RE.test(email)) {
+  if (typeof email !== "string" || email.length > MAX_EMAIL_LEN || !EMAIL_RE.test(email)) {
     return res.status(400).json({ error: "invalid_email" });
   }
-  if (typeof password !== "string" || password.length < 8 || password.length > 200) {
+  if (typeof password !== "string" || password.length < 8 || password.length > MAX_PASSWORD_LEN) {
     return res.status(400).json({ error: "invalid_password" });
   }
 
@@ -135,7 +165,7 @@ authRouter.post("/register", authLimiter, async (req, res) => {
 
 authRouter.post("/login", authLimiter, async (req, res) => {
   const { usernameOrEmail, password } = req.body || {};
-  if (!usernameOrEmail || typeof password !== "string") {
+  if (typeof usernameOrEmail !== "string" || usernameOrEmail.length > MAX_EMAIL_LEN || typeof password !== "string" || password.length > MAX_PASSWORD_LEN) {
     return res.status(400).json({ error: "invalid_credentials" });
   }
   const db = await getDb();

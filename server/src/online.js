@@ -25,7 +25,7 @@
 // Move validation: every move runs through the same chess-rules.js the
 // frontend uses. The client cannot inject illegal moves.
 
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import cookie from "cookie";
 import {
   startingPosition,
@@ -69,7 +69,7 @@ function isValidTimeControl(tc) {
 }
 
 function safeSend(ws, payload) {
-  if (!ws || ws.readyState !== ws.OPEN) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
   try { ws.send(JSON.stringify(payload)); } catch { /* ignore */ }
 }
 
