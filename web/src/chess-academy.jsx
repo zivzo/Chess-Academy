@@ -11,6 +11,7 @@ import GamePage from "./pages/GamePage.jsx";
 import StrategyPage from "./pages/StrategyPage.jsx";
 import TheoryPage from "./pages/TheoryPage.jsx";
 import QuizPage from "./pages/QuizPage.jsx";
+import OpeningPracticePage from "./pages/OpeningPracticePage.jsx";
 
 export default function ChessAcademy() {
   const [page, setPage] = useState("home");
@@ -26,6 +27,7 @@ export default function ChessAcademy() {
     { id:"home", label:"🏠 Home" },
     { id:"games", label:"♟ Games" },
     { id:"openings", label:"📖 Openings" },
+    { id:"practice-openings", label:"🎯 Practice Opening" },
     { id:"play", label:"♜ Local Game" },
     { id:"strategy", label:"⚔️ Strategy" },
     { id:"theory", label:"📚 Theory" },
@@ -126,7 +128,9 @@ export default function ChessAcademy() {
             {page==="home" && <Dashboard onNavigate={p => { setPage(p); setSelectedOpening(null); }} />}
             {page==="games" && <GamePage />}
             {page==="openings" && !selectedOpening && <OpeningsPage onSelect={o => setSelectedOpening(o)} />}
-            {page==="openings" && selectedOpening && <BoardViewer opening={selectedOpening} onBack={() => setSelectedOpening(null)} />}
+            {page==="openings" && selectedOpening && <BoardViewer opening={selectedOpening} onBack={() => setSelectedOpening(null)} onPractice={() => { setPage("practice-openings"); }} />}
+            {page==="practice-openings" && !selectedOpening && <OpeningsPage onSelect={o => setSelectedOpening(o)} />}
+            {page==="practice-openings" && selectedOpening && <OpeningPracticePage opening={selectedOpening} onBack={() => setSelectedOpening(null)} />}
             {page==="play" && <LocalGamePage />}
             {page==="strategy" && <StrategyPage />}
             {page==="theory" && <TheoryPage />}

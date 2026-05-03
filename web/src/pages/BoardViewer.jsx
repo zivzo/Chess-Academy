@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PIECES } from "../chess-core.js";
 import { playNavStep } from "../utils/chessSound.js";
 
-export default function BoardViewer({ opening, onBack }) {
+export default function BoardViewer({ opening, onBack, onPractice }) {
   const [step, setStep] = useState(0);
   const [variantId, setVariantId] = useState(null);
   const [ariaMsg, setAriaMsg] = useState("");
@@ -86,14 +86,22 @@ export default function BoardViewer({ opening, onBack }) {
       {/* Screen-reader live region */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">{ariaMsg}</div>
 
-      <div style={{display:"flex",alignItems:"center",gap:"1rem",marginBottom:"1.25rem"}}>
+      <div style={{display:"flex",alignItems:"center",gap:"1rem",marginBottom:"1.25rem",flexWrap:"wrap"}}>
         <button className="btn btn-outline btn-sm" onClick={onBack}>← Back</button>
-        <div>
+        <div style={{flex:1,minWidth:"200px"}}>
           <div className="page-title" style={{marginBottom:0}}>{opening.name}</div>
           <div className="page-subtitle" style={{marginBottom:0}}>
             <strong>{lineLabel}</strong> — Move {step} of {line.positions.length - 1}
           </div>
         </div>
+        {onPractice && (
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={onPractice}
+            title="Play this opening yourself against book responses"
+          >🎯 Practice this opening</button>
+        )}
       </div>
 
       <div className="board-wrap">
