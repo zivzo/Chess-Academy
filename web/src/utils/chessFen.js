@@ -100,7 +100,10 @@ export function moveToSan(board, move, gameState, getLegalMovesWithRules) {
   const isCapture = Boolean(board[move.tr][move.tc]) || move.enPassant;
   if (kind === "P") {
     let san = isCapture ? `${FILES[move.c]}x${dest}` : dest;
-    if (move.promotion) san += "=Q";
+    if (move.promotion) {
+      const p = typeof move.promotion === "string" ? move.promotion.toUpperCase() : "Q";
+      san += "=" + ("QRBN".includes(p) ? p : "Q");
+    }
     return san;
   }
   // Disambiguate

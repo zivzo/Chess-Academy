@@ -72,6 +72,16 @@ export function requireAuth(req, res, next) {
 // browser sends one automatically for all cross-origin fetches) or no
 // `Origin`/`Referer` at all (curl, Node clients — they don't carry our
 // cookies in the wild without explicit user action).
+//
+// NOTE: Static analyzers (CodeQL `js/missing-token-validation`) look for a
+// named CSRF-token middleware such as `csurf`. They don't recognize this
+// origin-based check, so they may flag this app as missing CSRF protection.
+// The combination of:
+//   - `sameSite=lax` cookies (modern browsers refuse to send them on
+//     cross-site POSTs in any case),
+//   - this same-origin `Origin`/`Referer` check,
+//   - the lack of any cross-origin form post target,
+// is sufficient CSRF protection for our first-party-only auth flow.
 export function requireSameOrigin(req, res, next) {
   const allowed = process.env.ALLOWED_ORIGIN; // e.g. "https://chess-academy.example.com"
   const host = req.headers["host"];

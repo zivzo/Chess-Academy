@@ -320,8 +320,14 @@ export default function AnalysisPage({ gameId, onBack }) {
             <div className="card" style={{padding:"0.7rem"}}>
               <div className="card-title" style={{fontSize:"0.9rem",marginBottom:"0.3rem"}}>Clock at this move</div>
               <div style={{fontFamily:"DM Mono, monospace",fontSize:"0.9rem"}}>
-                White: {formatTimeMs(game.moves[ply-1]?.timeLeftWhiteMs)} •
-                Black: {formatTimeMs(game.moves[ply-1]?.timeLeftBlackMs)}
+                {ply > 0 ? (
+                  <>
+                    White: {formatTimeMs(game.moves[ply-1]?.timeLeftWhiteMs)} •
+                    Black: {formatTimeMs(game.moves[ply-1]?.timeLeftBlackMs)}
+                  </>
+                ) : (
+                  <>White: {formatTimeMs(game.timeControl.baseMs)} • Black: {formatTimeMs(game.timeControl.baseMs)} (start)</>
+                )}
               </div>
             </div>
           )}

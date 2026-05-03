@@ -57,6 +57,10 @@ export default function GamePage() {
   const [sanList, setSanList] = useState([]);
   const [uciList, setUciList] = useState([]);
   const [fenList, setFenList] = useState([]);
+  // Mirror of sanList.length, kept as a ref so the engine-move effect can
+  // compute the move number without taking a dependency on the list length
+  // (which would re-trigger the effect on every move).
+  const movesPlayedRef = useRef(0);
   const startedAtRef = useRef(new Date().toISOString());
   const savedRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState(null);
@@ -101,7 +105,7 @@ export default function GamePage() {
 
     let cancelled = false;
     const requestId = ++moveRequestId.current;
-    const sanLen = sanList.length;
+    const sanLen = movesPlayedRef.current;
 
     getStockfishMove(board, "b", engineRating).then((move) => {
       // Ignore if a newer request was started or the effect was cleaned up.
@@ -132,7 +136,7 @@ export default function GamePage() {
         setStatus(nextStatus);
         setNavHistory(prev => [...prev, { board: nextBoard, lastMove: nextLastMove }]);
         setNavIndex(prev => prev + 1);
-        setSanList(prev => [...prev, san]);
+        setSanList(prev => { const n = [...prev, san]; movesPlayedRef.current = n.length; return n; });
         setUciList(prev => [...prev, uci]);
         setFenList(prev => [...prev, fenAfter]);
       }
@@ -140,7 +144,7 @@ export default function GamePage() {
     });
 
     return () => { cancelled = true; };
-  }, [turn, board, engineRating, gameState, status, sanList.length]);
+  }, [turn, board, engineRating, gameState, status]);
 
   // ── Fetch analysis whenever the position changes ───────────────────────────
   useEffect(() => {
@@ -175,6 +179,7 @@ export default function GamePage() {
     setSanList([]);
     setUciList([]);
     setFenList([]);
+    movesPlayedRef.current = 0;
     startedAtRef.current = new Date().toISOString();
     savedRef.current = false;
     setSaveStatus(null);
@@ -206,6 +211,7 @@ export default function GamePage() {
       setSanList(snap.sanList ?? []);
       setUciList(snap.uciList ?? []);
       setFenList(snap.fenList ?? []);
+      movesPlayedRef.current = (snap.sanList ?? []).length;
       savedRef.current = false;
       setSaveStatus(null);
       // Trim navHistory to match restored position (snap.history.length half-moves)
@@ -273,7 +279,7 @@ export default function GamePage() {
         applyMoveWithRules(board, chosenMove, gameState);
       const nextStatus = getGameStatus(nextBoard, "b", nextGameState);
       const nextLastMove = [{ r: chosenMove.r, c: chosenMove.c }, { r: chosenMove.tr, c: chosenMove.tc }];
-      const fenAfter = boardToFen(nextBoard, "b", nextGameState, 0, Math.floor((sanList.length + 1) / 2) + 1);
+      const fenAfter = boardToFen(nextBoard, "b", nextGameState, 0, Math.floor((movesPlayedRef.current + 1) / 2) + 1);
 
       // Sound
       if (nextStatus === "checkmate") playCheckmate();
@@ -294,7 +300,7 @@ export default function GamePage() {
       setMovesFromSquare([]);
       setNavHistory(prev => [...prev, { board: nextBoard, lastMove: nextLastMove }]);
       setNavIndex(prev => prev + 1);
-      setSanList(prev => [...prev, san]);
+      setSanList(prev => { const n = [...prev, san]; movesPlayedRef.current = n.length; return n; });
       setUciList(prev => [...prev, uci]);
       setFenList(prev => [...prev, fenAfter]);
       return;
