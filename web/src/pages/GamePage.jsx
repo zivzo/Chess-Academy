@@ -1,4 +1,4 @@
-// ── Play vs Stockfish + Analysis page ────────────────────────────────────────
+// ── Play vs Stockfish — Lichess-style dark analysis interface ─────────────────
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PIECES,
@@ -7,7 +7,6 @@ import {
   getLegalMovesWithRules,
   applyMoveWithRules,
   getGameStatus,
-  formatMove,
 } from "../chess-core.js";
 import {
   getStockfishMove,
@@ -40,218 +39,225 @@ function buildAnnouncement(toR, toC, isCapture, status, side) {
   return msg;
 }
 
+/** Produce a short algebraic label for a move (no disambiguation). */
+function moveLabel(board, move) {
+  const piece = board[move.r]?.[move.c];
+  if (!piece) return `${FILES[move.tc]}${8 - move.tr}`;
+  const type = piece[1];
+  const dest = `${FILES[move.tc]}${8 - move.tr}`;
+  const isCapture = Boolean(board[move.tr]?.[move.tc]);
+  if (type === "P") return isCapture ? `${FILES[move.c]}x${dest}` : dest;
+  return `${type}${isCapture ? "x" : ""}${dest}`;
+}
+
+function buildInitialState() {
+  return {
+    board: START.map(r => [...r]),
+    gameState: createGameState(),
+    turn: "w",
+    status: "playing",
+    lastFrom: null,
+    lastTo: null,
+  };
+}
+
 export default function GamePage() {
-  // Board & game state
-  const [board, setBoard]               = useState(() => START.map(r => [...r]));
-  const [turn, setTurn]                 = useState("w");
-  const [selected, setSelected]         = useState(null);
+  // boardHistory[0] = start, boardHistory[n] = state after n half-moves
+  const [boardHistory, setBoardHistory] = useState(() => [buildInitialState()]);
+  // Short algebraic notation for each half-move
+  const [moveNotations, setMoveNotations] = useState([]);
+  // Index into boardHistory that is currently displayed
+  const [viewIdx, setViewIdx] = useState(0);
+
+  // Interaction state
+  const [selected, setSelected]               = useState(null);
   const [movesFromSquare, setMovesFromSquare] = useState([]);
-  const [history, setHistory]           = useState([]);
-  const [lastMove, setLastMove]         = useState(null);
-
-  // UI state
-  const [activeTab, setActiveTab]       = useState("play");
-  const [engineRating, setEngineRating] = useState(DEFAULT_ENGINE_RATING);
-
-  // Rules engine state
-  const [gameState, setGameState] = useState(() => createGameState());
-  const [status, setStatus] = useState("playing"); // "playing" | "check" | "checkmate" | "stalemate"
-
-  // Snapshots for undo (each snapshot is the state *before* a move).
-  const [historyStack, setHistoryStack] = useState([]);
-
-  // Navigation history: [{board, lastMove}] — grows with every half-move.
-  // navHistory[0] = initial position, navHistory[k] = after k half-moves.
-  const [navHistory, setNavHistory] = useState(() => [{ board: START.map(r => [...r]), lastMove: null }]);
-  // navIndex: 0 = initial, navHistory.length-1 = live (latest)
-  const [navIndex, setNavIndex] = useState(0);
-
-  // Aria live region
-  const [ariaMsg, setAriaMsg] = useState("");
-
-  // Analysis state (async — null means "loading or not yet fetched")
-  const [analysis, setAnalysis]         = useState(null);
-
-  // Drag state
-  const [draggingSquare, setDraggingSquare] = useState(null);
+  const [draggingSquare, setDraggingSquare]   = useState(null);
   const dragValidDrop = useRef(false);
 
-  // Engine is thinking whenever it is Black's turn.
-  const engineThinking = turn === "b";
-
-  // Ref to track the latest request and avoid stale async responses.
+  // Engine
+  const [engineRating, setEngineRating] = useState(DEFAULT_ENGINE_RATING);
   const moveRequestId = useRef(0);
 
-  // ── Engine plays as Black (async) ──────────────────────────────────────────
-  useEffect(() => {
-    if (turn !== "b") return;
-    if (status === "checkmate" || status === "stalemate") return;
+  // Right-panel tab
+  const [activeTab, setActiveTab] = useState("analysis");
 
+  // Aria live announcement region
+  const [ariaMsg, setAriaMsg] = useState("");
+
+  // Analysis result for the currently viewed position
+  const [analysis, setAnalysis] = useState(null);
+
+  // ── Derived live state ─────────────────────────────────────────────────────
+  const liveState  = boardHistory[boardHistory.length - 1];
+  const viewedState = boardHistory[viewIdx];
+  const { board: liveBoard, gameState: liveGS, turn, status } = liveState;
+  const { board: displayBoard } = viewedState;
+
+  const isGameOver    = status === "checkmate" || status === "stalemate";
+  const engineThinking = turn === "b" && !isGameOver;
+  const isAtLatest    = viewIdx === boardHistory.length - 1;
+  const canInteract   = isAtLatest && turn === "w" && !engineThinking && !isGameOver;
+
+  // ── Engine plays as Black ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (turn !== "b" || isGameOver) return;
     let cancelled = false;
     const requestId = ++moveRequestId.current;
 
-    getStockfishMove(board, "b", engineRating).then((move) => {
-      // Ignore if a newer request was started or the effect was cleaned up.
-      if (cancelled || requestId !== moveRequestId.current) return;
+    getStockfishMove(liveBoard, "b", engineRating).then((move) => {
+      if (cancelled || requestId !== moveRequestId.current || !move) return;
 
-      if (move) {
-        const isCapture = Boolean(board[move.tr][move.tc]);
-        const { board: nextBoard, gameState: nextGS } =
-          applyMoveWithRules(board, move, gameState);
-        const nextStatus = getGameStatus(nextBoard, "w", nextGS);
-        const nextLastMove = [{ r: move.r, c: move.c }, { r: move.tr, c: move.tc }];
+      const isCapture = Boolean(liveBoard[move.tr][move.tc]);
+      const notation = moveLabel(liveBoard, move);
+      const { board: nextBoard, gameState: nextGS } = applyMoveWithRules(liveBoard, move, liveGS);
+      const nextStatus = getGameStatus(nextBoard, "w", nextGS);
+      const nextState = {
+        board: nextBoard, gameState: nextGS, turn: "w", status: nextStatus,
+        lastFrom: { r: move.r, c: move.c }, lastTo: { r: move.tr, c: move.tc },
+      };
 
-        // Sound
-        if (nextStatus === "checkmate") playCheckmate();
-        else if (nextStatus === "check") playCheck();
-        else if (isCapture) playCapture();
-        else playMove();
-
-        setAriaMsg(buildAnnouncement(move.tr, move.tc, isCapture, nextStatus, "Black"));
-
-        setBoard(nextBoard);
-        setGameState(nextGS);
-        setLastMove(nextLastMove);
-        setHistory(prev => [...prev, `Black: ${formatMove(move)}`]);
-        setStatus(nextStatus);
-        setNavHistory(prev => [...prev, { board: nextBoard, lastMove: nextLastMove }]);
-        setNavIndex(prev => prev + 1);
-      }
-      setTurn("w");
-    });
-
-    return () => { cancelled = true; };
-  }, [turn, board, engineRating, gameState, status]);
-
-  // ── Fetch analysis whenever the position changes ───────────────────────────
-  useEffect(() => {
-    if (activeTab !== "analysis") return;
-
-    let cancelled = false;
-
-    getStockfishAnalysis(board, turn).then((result) => {
-      if (!cancelled) {
-        setAnalysis(result);
-      }
-    });
-
-    return () => { cancelled = true; };
-  }, [board, turn, activeTab]);
-
-  // ── Reset ──────────────────────────────────────────────────────────────────
-  const resetGame = useCallback(() => {
-    moveRequestId.current++;          // Cancel any in-flight API call.
-    setBoard(START.map(r => [...r]));
-    setTurn("w");
-    setSelected(null);
-    setMovesFromSquare([]);
-    setHistory([]);
-    setLastMove(null);
-    setAnalysis(null);
-    setGameState(createGameState());
-    setStatus("playing");
-    setHistoryStack([]);
-    setNavHistory([{ board: START.map(r => [...r]), lastMove: null }]);
-    setNavIndex(0);
-    setAriaMsg("Game reset");
-    playGameStart();
-  }, []);
-
-  // ── Undo ───────────────────────────────────────────────────────────────────
-  // Step back to the most recent White-to-move position so the human can
-  // replay. Snapshots are only pushed before the human's move (never before
-  // the engine's reply), so popping one always lands on a White-to-move state
-  // — automatically rolling back the engine's reply along with it.
-  const undoMove = useCallback(() => {
-    setHistoryStack(prevStack => {
-      if (prevStack.length === 0) return prevStack;
-      const stack = prevStack.slice();
-      const snap = stack.pop();
-      moveRequestId.current++;        // Cancel any in-flight engine API call.
-
-      setBoard(snap.board);
-      setTurn(snap.turn);
-      setGameState(snap.gameState);
-      setStatus(snap.status);
-      setHistory(snap.history);
-      setLastMove(snap.lastMove ?? null);
-      setSelected(null);
-      setMovesFromSquare([]);
-      setAnalysis(null);
-      // Trim navHistory to match restored position (snap.history.length half-moves)
-      const trimTo = snap.history.length + 1;
-      setNavHistory(prev => prev.slice(0, trimTo));
-      setNavIndex(snap.history.length);
-      return stack;
-    });
-  }, []);
-
-  function colorName(color) {
-    return color === "w" ? "White" : "Black";
-  }
-
-  // ── Square click handler ───────────────────────────────────────────────────
-  function onSquareClick(r, c) {
-    // Snap out of review mode on any click
-    if (navIndex < navHistory.length - 1) {
-      setNavIndex(navHistory.length - 1);
-      setSelected(null);
-      setMovesFromSquare([]);
-      return;
-    }
-
-    if (turn !== "w" || engineThinking) return;
-    if (status === "checkmate" || status === "stalemate") return;
-
-    const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
-    if (selected && chosenMove) {
-      const isCapture = Boolean(board[chosenMove.tr][chosenMove.tc]);
-      const snapshot = { board, turn, gameState, status, history, lastMove };
-      const { board: nextBoard, gameState: nextGameState } =
-        applyMoveWithRules(board, chosenMove, gameState);
-      const nextStatus = getGameStatus(nextBoard, "b", nextGameState);
-      const nextLastMove = [{ r: chosenMove.r, c: chosenMove.c }, { r: chosenMove.tr, c: chosenMove.tc }];
-
-      // Sound
+      // Sound + screen-reader announcement
       if (nextStatus === "checkmate") playCheckmate();
       else if (nextStatus === "check") playCheck();
       else if (isCapture) playCapture();
       else playMove();
+      setAriaMsg(buildAnnouncement(move.tr, move.tc, isCapture, nextStatus, "Black"));
 
+      setBoardHistory(prev => {
+        const updated = [...prev, nextState];
+        setViewIdx(updated.length - 1);
+        return updated;
+      });
+      setMoveNotations(prev => [...prev, notation]);
+    });
+
+    return () => { cancelled = true; };
+  }, [turn, liveBoard, engineRating, liveGS, isGameOver]);
+
+  // ── Fetch analysis for the viewed position ─────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setAnalysis(null);
+    const { board: vBoard, turn: vTurn } = viewedState;
+    getStockfishAnalysis(vBoard, vTurn).then((result) => {
+      if (!cancelled) setAnalysis(result);
+    });
+    return () => { cancelled = true; };
+  }, [viewedState]);
+
+  // ── Reset ──────────────────────────────────────────────────────────────────
+  const resetGame = useCallback(() => {
+    moveRequestId.current++;
+    setBoardHistory([buildInitialState()]);
+    setMoveNotations([]);
+    setViewIdx(0);
+    setSelected(null);
+    setMovesFromSquare([]);
+    setAnalysis(null);
+    setAriaMsg("Game reset");
+    playGameStart();
+  }, []);
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
+  const goToMove = useCallback((idx, histLen) => {
+    const len = histLen ?? boardHistory.length;
+    const clamped = Math.max(0, Math.min(len - 1, idx));
+    setViewIdx(prev => {
+      if (clamped !== prev) {
+        playNavStep();
+        if (clamped === 0) setAriaMsg("Start position");
+        else if (clamped === len - 1) setAriaMsg("Live position");
+        else setAriaMsg(`Move ${clamped} of ${len - 1}`);
+      }
+      return clamped;
+    });
+    setSelected(null);
+    setMovesFromSquare([]);
+  }, [boardHistory.length]);
+
+  useEffect(() => {
+    function onKey(e) {
+      const last = boardHistory.length - 1;
+      if (e.key === "ArrowLeft") {
+        setViewIdx(v => {
+          if (v <= 0) return v;
+          playNavStep();
+          setAriaMsg(v - 1 === 0 ? "Start position" : `Move ${v - 1} of ${last}`);
+          return v - 1;
+        });
+      }
+      if (e.key === "ArrowRight") {
+        setViewIdx(v => {
+          if (v >= last) return v;
+          playNavStep();
+          setAriaMsg(v + 1 >= last ? "Live position" : `Move ${v + 1} of ${last}`);
+          return v + 1;
+        });
+      }
+      if (e.key === "Home") {
+        setViewIdx(v => {
+          if (v === 0) return v;
+          playNavStep(); setAriaMsg("Start position"); return 0;
+        });
+      }
+      if (e.key === "End") {
+        setViewIdx(v => {
+          if (v === last) return v;
+          playNavStep(); setAriaMsg("Live position"); return last;
+        });
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [boardHistory.length]);
+
+  // ── Square click ───────────────────────────────────────────────────────────
+  function onSquareClick(r, c) {
+    if (!isAtLatest) { setViewIdx(boardHistory.length - 1); return; }
+    if (!canInteract) return;
+
+    const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
+    if (selected && chosenMove) {
+      const isCapture = Boolean(liveBoard[chosenMove.tr][chosenMove.tc]);
+      const notation = moveLabel(liveBoard, chosenMove);
+      const { board: nextBoard, gameState: nextGS } = applyMoveWithRules(liveBoard, chosenMove, liveGS);
+      const nextStatus = getGameStatus(nextBoard, "b", nextGS);
+      const nextState = {
+        board: nextBoard, gameState: nextGS, turn: "b", status: nextStatus,
+        lastFrom: { r: chosenMove.r, c: chosenMove.c }, lastTo: { r: chosenMove.tr, c: chosenMove.tc },
+      };
+
+      // Sound + screen-reader announcement
+      if (nextStatus === "checkmate") playCheckmate();
+      else if (nextStatus === "check") playCheck();
+      else if (isCapture) playCapture();
+      else playMove();
       setAriaMsg(buildAnnouncement(chosenMove.tr, chosenMove.tc, isCapture, nextStatus, "White"));
 
-      setHistoryStack(prev => [...prev, snapshot]);
-      setBoard(nextBoard);
-      setGameState(nextGameState);
-      setLastMove(nextLastMove);
-      setHistory(prev => [...prev, `White: ${formatMove(chosenMove)}`]);
-      setTurn("b");
-      setStatus(nextStatus);
+      setBoardHistory(prev => {
+        const updated = [...prev, nextState];
+        setViewIdx(updated.length - 1);
+        return updated;
+      });
+      setMoveNotations(prev => [...prev, notation]);
       setSelected(null);
       setMovesFromSquare([]);
-      setNavHistory(prev => [...prev, { board: nextBoard, lastMove: nextLastMove }]);
-      setNavIndex(prev => prev + 1);
       return;
     }
 
-    const piece = board[r][c];
+    const piece = liveBoard[r][c];
     if (!piece || piece[0] !== "w") {
       if (selected) playIllegal();
-      setSelected(null);
-      setMovesFromSquare([]);
-      return;
+      setSelected(null); setMovesFromSquare([]); return;
     }
-
     setSelected([r, c]);
-    setMovesFromSquare(getLegalMovesWithRules(board, r, c, gameState));
+    setMovesFromSquare(getLegalMovesWithRules(liveBoard, r, c, liveGS));
   }
 
   function onDragStart(e, r, c) {
-    if (navIndex < navHistory.length - 1) { e.preventDefault(); return; } // can't drag in review mode
-    if (turn !== "w" || engineThinking || status === "checkmate" || status === "stalemate") {
-      e.preventDefault(); return;
-    }
-    const piece = board[r][c];
+    if (!canInteract) { e.preventDefault(); return; }
+    const piece = liveBoard[r][c];
     if (!piece || piece[0] !== "w") { e.preventDefault(); return; }
     const ghost = document.createElement("div");
     ghost.textContent = PIECES[piece];
@@ -262,307 +268,278 @@ export default function GamePage() {
     setTimeout(() => ghost.remove(), 0);
     setDraggingSquare({ r, c });
     setSelected([r, c]);
-    setMovesFromSquare(getLegalMovesWithRules(board, r, c, gameState));
+    setMovesFromSquare(getLegalMovesWithRules(liveBoard, r, c, liveGS));
   }
 
   function onDragOver(e, r, c) {
-    const isLegalTarget = movesFromSquare.some((m) => m.tr === r && m.tc === c);
-    if (isLegalTarget) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
+    if (movesFromSquare.some(m => m.tr === r && m.tc === c)) {
+      e.preventDefault(); e.dataTransfer.dropEffect = "move";
     }
   }
 
   function onDrop(e, r, c) {
-    e.preventDefault();
-    dragValidDrop.current = true;
-    onSquareClick(r, c);
-    setDraggingSquare(null);
+    e.preventDefault(); dragValidDrop.current = true;
+    onSquareClick(r, c); setDraggingSquare(null);
   }
 
   function onDragEnd() {
-    if (!dragValidDrop.current) {
-      setSelected(null);
-      setMovesFromSquare([]);
-    }
-    dragValidDrop.current = false;
-    setDraggingSquare(null);
+    if (!dragValidDrop.current) { setSelected(null); setMovesFromSquare([]); }
+    dragValidDrop.current = false; setDraggingSquare(null);
   }
 
-  // ── Keyboard navigation ─────────────────────────────────────────────────────
-  const liveNavIndex = navHistory.length - 1;
-  const isReviewing = navIndex < liveNavIndex;
+  // ── Derived display values ─────────────────────────────────────────────────
+  // Evaluation bar constants
+  const MATE_EVAL_MAGNITUDE = 10;  // treat mate as ±10 pawns for bar display
+  const MIN_BAR_PERCENT     = 4;   // never collapse the bar completely
+  const MAX_BAR_PERCENT     = 96;
+  const EVAL_SCALE_FACTOR   = 4.6; // pawns → percentage points (10 pawns ≈ 46 pp)
 
-  const goBack = useCallback(() => {
-    setNavIndex(v => {
-      if (v <= 0) return v;
-      playNavStep();
-      setAriaMsg(`Move ${v - 1} of ${liveNavIndex}`);
-      return v - 1;
-    });
-  }, [liveNavIndex]);
+  const moveDests    = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
+  const evalText     = analysis ? formatEval(analysis.evaluation, analysis.mate) : "…";
+  const evalNum      = analysis?.mate != null
+    ? (analysis.mate > 0 ? MATE_EVAL_MAGNITUDE : -MATE_EVAL_MAGNITUDE)
+    : (analysis?.evaluation ?? 0);
+  const whitePercent = Math.max(MIN_BAR_PERCENT, Math.min(MAX_BAR_PERCENT, 50 + evalNum * EVAL_SCALE_FACTOR));
 
-  const goForward = useCallback(() => {
-    setNavIndex(v => {
-      if (v >= liveNavIndex) return v;
-      playNavStep();
-      const next = v + 1;
-      setAriaMsg(next >= liveNavIndex ? "Live position" : `Move ${next} of ${liveNavIndex}`);
-      return next;
-    });
-  }, [liveNavIndex]);
-
-  const goToStart = useCallback(() => {
-    if (liveNavIndex === 0) return;
-    playNavStep();
-    setNavIndex(0);
-    setAriaMsg("Start position");
-  }, [liveNavIndex]);
-
-  const goToEnd = useCallback(() => {
-    if (!isReviewing) return;
-    playNavStep();
-    setNavIndex(liveNavIndex);
-    setAriaMsg("Live position");
-  }, [isReviewing, liveNavIndex]);
-
-  function handleKeyDown(e) {
-    if (e.key === "ArrowLeft")  { e.preventDefault(); goBack(); }
-    if (e.key === "ArrowRight") { e.preventDefault(); goForward(); }
-    if (e.key === "Home")       { e.preventDefault(); goToStart(); }
-    if (e.key === "End")        { e.preventDefault(); goToEnd(); }
+  // Build move pairs for the move list
+  const movePairs = [];
+  for (let i = 0; i < moveNotations.length; i += 2) {
+    movePairs.push({ white: moveNotations[i], black: moveNotations[i + 1] ?? null });
   }
+  // Index of the "current" notation = the move that got us to viewIdx
+  const currentMoveIdx = viewIdx > 0 ? viewIdx - 1 : null;
 
-  // ── Derive view state ──────────────────────────────────────────────────────
-  const viewBoard = navHistory[navIndex]?.board ?? board;
-  const viewLastMove = navHistory[navIndex]?.lastMove ?? lastMove;
-
-  // ── Derived values ─────────────────────────────────────────────────────────
-  const isGameOver = status === "checkmate" || status === "stalemate";
-  // Lock the engine strength as soon as a move has been played so changing it
-  // mid-game can't interfere with the engine's in-flight calculation. It
-  // becomes editable again after `resetGame` clears the history.
-  const isStrengthLocked = history.length > 0 && !isGameOver;
-  const moveDests = new Set(movesFromSquare.map(m => `${m.tr}-${m.tc}`));
   const { label: ratingLabel, css: ratingCss } = strengthLabel(engineRating);
-  const evalText = analysis ? formatEval(analysis.evaluation, analysis.mate) : "0.0";
-
-  const canInteract = turn === "w" && !engineThinking && !isGameOver && !isReviewing;
+  const isStrengthLocked = moveNotations.length > 0 && !isGameOver;
 
   const kingInCheckPos = (() => {
-    if (status !== "check" && status !== "checkmate") return null;
-    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (board[r][c] === `${turn}K`) return [r, c];
+    if (viewedState.status !== "check" && viewedState.status !== "checkmate") return null;
+    const b = displayBoard; const t = viewedState.turn;
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (b[r][c] === `${t}K`) return [r, c];
     return null;
   })();
 
-  let turnLabel;
-  if (status === "checkmate") {
-    const winner = turn === "w" ? "b" : "w";
-    turnLabel = `Checkmate! ${colorName(winner)} wins`;
-  } else if (status === "stalemate") {
-    turnLabel = "Stalemate — Draw";
-  } else if (engineThinking) {
-    turnLabel = "Stockfish thinking…";
-  } else if (status === "check") {
-    turnLabel = `${colorName(turn)} is in check`;
-  } else {
-    turnLabel = `${colorName(turn)} to move`;
-  }
+  let statusMsg;
+  if (status === "checkmate")      statusMsg = `Checkmate! ${turn === "w" ? "Black" : "White"} wins`;
+  else if (status === "stalemate") statusMsg = "Stalemate — Draw";
+  else if (engineThinking)         statusMsg = "Stockfish is thinking…";
+  else if (status === "check")     statusMsg = `${turn === "w" ? "White" : "Black"} is in check`;
+  else                             statusMsg = `${turn === "w" ? "White" : "Black"} to move`;
 
+  const lastMove = viewedState.lastFrom ? viewedState : null;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="fade-in">
+    <div className="lc-page">
       {/* Screen-reader live region */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">{ariaMsg}</div>
 
-      <div className="page-title">Play vs Stockfish</div>
-      <div className="page-subtitle">
-        Play as White against the Stockfish engine. Adjust strength and switch to Analysis for recommendations.
-      </div>
-
-      <div className="tab-row">
-        <button className={`mini-tab ${activeTab === "play" ? "active" : ""}`} onClick={() => setActiveTab("play")}>♟ Game</button>
-        <button className={`mini-tab ${activeTab === "analysis" ? "active" : ""}`} onClick={() => setActiveTab("analysis")}>🔍 Analysis</button>
-      </div>
-
-      {/* ── Engine strength selector ── */}
-      {/* Strength is locked once the game has started so changing it mid-game
-          cannot disturb the engine's in-flight move calculation. It unlocks on Reset. */}
-      <div className="strength-selector">
-        <label>
-          Engine Strength: <strong>{engineRating}</strong> Elo
-          <span className={`strength-badge ${ratingCss}`}>{ratingLabel}</span>
-        </label>
-        <input
-          type="range"
-          min={MIN_ENGINE_RATING}
-          max={MAX_ENGINE_RATING}
-          step={100}
-          value={engineRating}
-          disabled={isStrengthLocked}
-          onChange={(e) => setEngineRating(Number(e.target.value))}
-        />
-        <div className="strength-labels">
-          <span>Beginner ({MIN_ENGINE_RATING})</span>
-          <span>Master ({MAX_ENGINE_RATING})</span>
+      {/* ── Board section ── */}
+      <div className="lc-board-section">
+        {/* Black player label */}
+        <div className="lc-player">
+          <div className="lc-avatar">♟</div>
+          <span className="lc-player-name">Black</span>
+          {engineThinking && <span className="lc-thinking-dot" />}
         </div>
-        {isStrengthLocked && (
-          <div className="strength-locked-hint">
-            🔒 Engine strength is locked during the game. Reset to change it.
-          </div>
-        )}
-      </div>
 
-      <div className="game-controls">
-        <span className="turn-pill">{isGameOver ? "🏁" : status === "check" ? "⚠️" : "⏱"} {turnLabel}</span>
-        <button
-          className="btn btn-sm btn-outline"
-          onClick={undoMove}
-          disabled={historyStack.length === 0}
-        >↶ Undo</button>
-        <button className="btn btn-sm btn-outline" onClick={resetGame}>Reset Game</button>
-      </div>
-
-      <div className="board-wrap">
-        <div
-          className="board-outer"
-          tabIndex={0}
-          onKeyDown={handleKeyDown}
-          aria-label={`Chess board. ${isReviewing ? `Reviewing move ${navIndex} of ${liveNavIndex}.` : turnLabel} Use arrow keys to navigate move history.`}
-          style={{outline:"none"}}
-        >
-          <div className="board-files">
-            {["a","b","c","d","e","f","g","h"].map(f => <div key={f} className="board-file-label">{f}</div>)}
+        <div className="lc-board-row">
+          {/* Evaluation bar */}
+          <div className="lc-eval-bar" title={evalText}>
+            <div className="lc-eval-black" style={{ height: `${100 - whitePercent}%` }} />
+            <div className="lc-eval-white" style={{ height: `${whitePercent}%` }} />
+            <div className="lc-eval-score">{evalText}</div>
           </div>
-          <div className="board-labels-row">
-            <div style={{display:"flex",flexDirection:"column"}}>
-              {[8,7,6,5,4,3,2,1].map(r => <div key={r} className="board-rank-label">{r}</div>)}
+
+          {/* Board with coordinate labels */}
+          <div className="lc-board-coords">
+            <div className="lc-ranks">
+              {[8,7,6,5,4,3,2,1].map(r => (
+                <div key={r} className="lc-rank-label">{r}</div>
+              ))}
             </div>
-            <div className="board">
-              {viewBoard.map((row, ri) =>
-                row.map((piece, ci) => {
-                  const isLight = (ri + ci) % 2 === 0;
-                  const isSelected = !isReviewing && selected && selected[0] === ri && selected[1] === ci;
-                  const isLegalEmpty = !isReviewing && moveDests.has(`${ri}-${ci}`) && !viewBoard[ri][ci];
-                  const isLegalCapture = !isReviewing && moveDests.has(`${ri}-${ci}`) && Boolean(viewBoard[ri][ci]);
-                  const isWhitePiece = Boolean(piece && piece[0] === "w");
-                  const isMoved = Boolean(viewLastMove?.some(sq => sq.r === ri && sq.c === ci));
-                  const isDragging = !isReviewing && draggingSquare?.r === ri && draggingSquare?.c === ci;
-                  const isInCheck = kingInCheckPos && kingInCheckPos[0] === ri && kingInCheckPos[1] === ci;
-                  const className = [
-                    "sq",
-                    isLight ? "light" : "dark",
-                    isMoved && "moved",
-                    isSelected && "selected",
-                    isLegalEmpty && "legal-empty",
-                    isLegalCapture && "legal-capture",
-                    canInteract && isWhitePiece && "piece-grabbable",
-                    isDragging && "dragging",
-                    isInCheck && "in-check",
-                  ].filter(Boolean).join(" ");
-                  return (
-                    <div
-                      key={`${ri}-${ci}`}
-                      className={className}
-                      draggable={canInteract && isWhitePiece}
-                      onClick={() => onSquareClick(ri, ci)}
-                      onDragStart={(e) => onDragStart(e, ri, ci)}
-                      onDragOver={(e) => onDragOver(e, ri, ci)}
-                      onDrop={(e) => onDrop(e, ri, ci)}
-                      onDragEnd={onDragEnd}
-                    >
-                      {piece ? PIECES[piece] : ""}
-                    </div>
-                  );
-                })
-              )}
+            <div>
+              <div className="lc-board">
+                {displayBoard.map((row, ri) =>
+                  row.map((piece, ci) => {
+                    const isLight    = (ri + ci) % 2 === 0;
+                    const isSel      = selected && selected[0] === ri && selected[1] === ci;
+                    const isLegalEmp = moveDests.has(`${ri}-${ci}`) && !displayBoard[ri][ci];
+                    const isLegalCap = moveDests.has(`${ri}-${ci}`) && Boolean(displayBoard[ri][ci]);
+                    const isDragging = draggingSquare?.r === ri && draggingSquare?.c === ci;
+                    const isCheck    = kingInCheckPos && kingInCheckPos[0] === ri && kingInCheckPos[1] === ci;
+                    const isLastFrom = lastMove?.lastFrom?.r === ri && lastMove?.lastFrom?.c === ci;
+                    const isLastTo   = lastMove?.lastTo?.r === ri && lastMove?.lastTo?.c === ci;
+                    const cn = [
+                      "sq",
+                      isLight ? "lc-light" : "lc-dark",
+                      isSel        && "selected",
+                      isLegalEmp   && "legal-empty",
+                      isLegalCap   && "legal-capture",
+                      (isLastFrom || isLastTo) && "lc-last-move-sq",
+                      canInteract && piece && piece[0] === "w" && "piece-grabbable",
+                      isDragging   && "dragging",
+                      isCheck      && "in-check",
+                    ].filter(Boolean).join(" ");
+                    return (
+                      <div
+                        key={`${ri}-${ci}`}
+                        className={cn}
+                        draggable={canInteract && Boolean(piece && piece[0] === "w")}
+                        onClick={() => onSquareClick(ri, ci)}
+                        onDragStart={(e) => onDragStart(e, ri, ci)}
+                        onDragOver={(e)  => onDragOver(e, ri, ci)}
+                        onDrop={(e)      => onDrop(e, ri, ci)}
+                        onDragEnd={onDragEnd}
+                      >
+                        {piece ? PIECES[piece] : ""}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <div className="lc-files">
+                {["a","b","c","d","e","f","g","h"].map(f => (
+                  <div key={f} className="lc-file-label">{f}</div>
+                ))}
+              </div>
             </div>
           </div>
-          {/* Navigation buttons + move counter */}
-          <div className="board-nav">
-            <button
-              className="nav-arrow"
-              disabled={liveNavIndex === 0}
-              onClick={goToStart}
-              aria-label="Go to start"
-            >⟪</button>
-            <button
-              className="nav-arrow"
-              disabled={navIndex <= 0}
-              onClick={goBack}
-              aria-label="Previous move"
-            >‹</button>
-            <button
-              className="nav-arrow"
-              disabled={navIndex >= liveNavIndex}
-              onClick={goForward}
-              aria-label="Next move"
-            >›</button>
-            <button
-              className="nav-arrow"
-              disabled={!isReviewing}
-              onClick={goToEnd}
-              aria-label="Go to latest move"
-            >⟫</button>
-            {liveNavIndex > 0 && (
-              <span className={`nav-counter${isReviewing ? " reviewing" : ""}`}>
-                {navIndex} / {liveNavIndex}
+        </div>
+
+        {/* White player label */}
+        <div className="lc-player">
+          <div className="lc-avatar lc-avatar-white">♔</div>
+          <span className="lc-player-name">White</span>
+          {isAtLatest && analysis && !engineThinking && (
+            <span className="lc-player-eval">
+              {evalNum > 0 ? `+${evalNum.toFixed(1)}` : evalNum < 0 ? evalNum.toFixed(1) : "="}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Right panel ── */}
+      <div className="lc-panel">
+        <div className="lc-panel-title">
+          <span className="lc-panel-icon">⊕</span> Analysis
+        </div>
+
+        <div className="lc-panel-tabs">
+          <button
+            className={`lc-panel-tab ${activeTab === "analysis" ? "active" : ""}`}
+            onClick={() => setActiveTab("analysis")}
+          >Analysis</button>
+          <button
+            className={`lc-panel-tab ${activeTab === "settings" ? "active" : ""}`}
+            onClick={() => setActiveTab("settings")}
+          >Settings</button>
+        </div>
+
+        {activeTab === "analysis" && (
+          <div className="lc-analysis-body">
+            <div className="lc-analysis-bar">
+              <span className="lc-analysis-label">
+                <span className="lc-green-dot" /> Analysis
               </span>
+              <span className="lc-depth-badge">depth=15</span>
+            </div>
+
+            {moveNotations.length > 0 && (
+              <div className="lc-last-move-info">
+                ⚫ <strong>{moveNotations[moveNotations.length - 1]}</strong> was played
+              </div>
+            )}
+
+            {analysis ? (
+              <div className="lc-engine-line">
+                <span className={`lc-eval-chip ${evalNum >= 0 ? "lc-eval-white-adv" : "lc-eval-black-adv"}`}>
+                  {evalText}
+                </span>
+                <span className="lc-engine-best">
+                  Best: {analysis.move ? moveLabel(viewedState.board, analysis.move) : "None"}
+                </span>
+                {analysis.source === "local" && (
+                  <span className="lc-engine-src">(local)</span>
+                )}
+              </div>
+            ) : (
+              <div className="lc-engine-thinking">Analyzing…</div>
             )}
           </div>
-          {isReviewing && (
-            <div className="board-review-hint">
-              Reviewing history — click board to return to live
+        )}
+
+        {activeTab === "settings" && (
+          <div className="lc-settings-body">
+            <div className="lc-setting-label">
+              Engine Strength: <strong>{engineRating}</strong> Elo
+              <span className={`strength-badge ${ratingCss}`}>{ratingLabel}</span>
             </div>
-          )}
+            <input
+              type="range"
+              min={MIN_ENGINE_RATING} max={MAX_ENGINE_RATING} step={100}
+              value={engineRating}
+              disabled={isStrengthLocked}
+              onChange={(e) => setEngineRating(Number(e.target.value))}
+              className="lc-range"
+            />
+            <div className="lc-range-ends">
+              <span>Beginner</span><span>Master</span>
+            </div>
+            {isStrengthLocked && (
+              <div className="lc-locked-hint">🔒 Locked during game. Reset to change.</div>
+            )}
+          </div>
+        )}
+
+        {/* Status pill */}
+        <div className="lc-status">
+          {isGameOver ? "🏁" : status === "check" ? "⚠️" : "●"} {statusMsg}
         </div>
 
-        <div className="move-list-wrap">
-          {activeTab === "analysis" && (
-            <>
-              <div className="engine-rec">
-                <h4>Stockfish Recommendation</h4>
-                {!analysis ? (
-                  <p>Analyzing position…</p>
-                ) : (
-                  <p>
-                    {analysis?.move
-                      ? `${turn === "w" ? "White" : "Black"} best move: ${formatMove(analysis.move)}`
-                      : "No legal moves available from this position."}
-                    <br />
-                    Evaluation (White perspective): <strong>{evalText}</strong>
-                  </p>
-                )}
-                {analysis?.source && (
-                  <div className="engine-source">
-                    Source: {analysis.source === "stockfish" ? "Stockfish API" : "Local engine (API unavailable)"}
-                  </div>
-                )}
-              </div>
-              <div className="card" style={{padding:"1rem"}}>
-                <div className="card-title" style={{fontSize:"0.92rem"}}>How to use this tab</div>
-                <div className="card-body">
-                  After each move, check the suggested move and compare it to what you played.
-                  If they differ, ask what tactical or positional idea the engine saw first.
-                </div>
-              </div>
-            </>
+        {/* Move list */}
+        <div className="lc-move-list-header">White — Black</div>
+        <div className="lc-move-list" ref={el => {
+          if (el && currentMoveIdx !== null) {
+            const active = el.querySelector(".lc-move-cell.active");
+            active?.scrollIntoView({ block: "nearest" });
+          }
+        }}>
+          {moveNotations.length === 0 && (
+            <div className="lc-no-moves">No moves yet — play as White</div>
           )}
-
-          <div className="move-list-title">Game Moves</div>
-          <div className="move-list">
-            {history.length === 0 && <span className="move-number">No moves yet</span>}
-            {history.map((entry, i) => (
-              <div
-                key={i}
-                className={`move-chip${navIndex === i + 1 && isReviewing ? " active" : ""}`}
-                onClick={() => { setNavIndex(i + 1); setAriaMsg(`Move ${i + 1} of ${liveNavIndex}`); }}
-              >{entry}</div>
-            ))}
-          </div>
-          {history.length > 0 && (
-            <div style={{fontSize:"0.75rem",color:"var(--muted)",marginTop:"0.3rem"}}>
-              Use <strong>← →</strong> arrow keys to step through moves.
+          {movePairs.map((pair, i) => (
+            <div key={i} className="lc-move-row">
+              <span className="lc-move-num">{i + 1}.</span>
+              <button
+                className={`lc-move-cell ${currentMoveIdx === i * 2 ? "active" : ""}`}
+                onClick={() => goToMove(i * 2 + 1)}
+              >{pair.white}</button>
+              {pair.black != null && (
+                <button
+                  className={`lc-move-cell ${currentMoveIdx === i * 2 + 1 ? "active" : ""}`}
+                  onClick={() => goToMove(i * 2 + 2)}
+                >{pair.black}</button>
+              )}
             </div>
+          ))}
+        </div>
+
+        {/* Navigation buttons */}
+        <div className="lc-nav-row">
+          <button className="lc-nav-btn" onClick={() => goToMove(0)}          disabled={viewIdx === 0}>|◀</button>
+          <button className="lc-nav-btn" onClick={() => goToMove(viewIdx - 1)} disabled={viewIdx === 0}>◀</button>
+          <button className="lc-nav-btn" onClick={() => goToMove(viewIdx + 1)} disabled={isAtLatest}>▶</button>
+          <button className="lc-nav-btn" onClick={() => goToMove(boardHistory.length - 1)} disabled={isAtLatest}>▶|</button>
+        </div>
+
+        {/* Action buttons */}
+        <div className="lc-action-row">
+          <button className="lc-action-btn" onClick={resetGame}>⊕ New Game</button>
+          {!isAtLatest && (
+            <button className="lc-action-btn" onClick={() => goToMove(boardHistory.length - 1)}>
+              ▶ Resume
+            </button>
           )}
         </div>
       </div>
