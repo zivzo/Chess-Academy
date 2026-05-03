@@ -291,13 +291,26 @@ export function getAllLegalMoves(board, color, gameState) {
   return moves;
 }
 
-// ── Apply move with full rules (returns { board, gameState }) ────────────────
+// ── Apply move with full rules ──────────────────────────────────────────────
+// Returns { board, gameState } on success.  If the move would leave the
+// moving side's own king in check (i.e. the move is illegal — for example,
+// moving a pinned piece off the pin), the original board and gameState are
+// returned unchanged together with `illegal: true`, so callers can detect and
+// recover.  This is a last-line-of-defense guard: callers that already use
+// `getAllLegalMoves` / `getLegalMovesWithRules` will never trigger it, but it
+// prevents *any* code path (including buggy or external move sources such as
+// the Stockfish API) from silently corrupting the position.
 export function applyMoveWithRules(board, move, gameState) {
-  const piece = board[move.r][move.c];
-  if (!piece) return { board, gameState };
+  const piece = board[move.r] && board[move.r][move.c];
+  if (!piece) return { board, gameState, illegal: true };
 
   const color = piece[0];
   const nextBoard = applyRawMove(board, move);
+
+  // Reject any move that leaves the moving side's own king in check.
+  if (isInCheck(nextBoard, color)) {
+    return { board, gameState, illegal: true };
+  }
 
   // Update game state
   const nextState = {

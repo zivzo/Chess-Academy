@@ -291,9 +291,14 @@ export function getEngineRecommendation(board, side, gameState) {
   let bestRawScore = 0;
 
   for (const move of moves) {
-    const nextBoard = gameState
-      ? applyMoveWithRules(board, move, gameState).board
-      : applyBoardMove(board, move);
+    let nextBoard;
+    if (gameState) {
+      const applied = applyMoveWithRules(board, move, gameState);
+      if (applied.illegal) continue;
+      nextBoard = applied.board;
+    } else {
+      nextBoard = applyBoardMove(board, move);
+    }
     const score = evaluateBoard(nextBoard);
     const perspectiveScore = side === "w" ? score : -score;
     if (perspectiveScore > bestPerspectiveScore) {
