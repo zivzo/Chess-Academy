@@ -26,6 +26,9 @@ import {
   playGameStart,
   playNavStep,
 } from "../utils/chessSound.js";
+import { boardToFen, moveToUci, moveToSan } from "../utils/chessFen.js";
+import { saveFinishedGame } from "../utils/saveGame.js";
+import { useAuth } from "../utils/useAuth.js";
 
 const FILES = "abcdefgh";
 
@@ -41,6 +44,7 @@ function buildAnnouncement(toR, toC, isCapture, status, side) {
 }
 
 export default function GamePage() {
+  const { user } = useAuth();
   // Board & game state
   const [board, setBoard]               = useState(() => START.map(r => [...r]));
   const [turn, setTurn]                 = useState("w");
@@ -48,6 +52,14 @@ export default function GamePage() {
   const [movesFromSquare, setMovesFromSquare] = useState([]);
   const [history, setHistory]           = useState([]);
   const [lastMove, setLastMove]         = useState(null);
+
+  // Recorded SAN/UCI/FEN per ply (for game persistence).
+  const [sanList, setSanList] = useState([]);
+  const [uciList, setUciList] = useState([]);
+  const [fenList, setFenList] = useState([]);
+  const startedAtRef = useRef(new Date().toISOString());
+  const savedRef = useRef(false);
+  const [saveStatus, setSaveStatus] = useState(null);
 
   // UI state
   const [activeTab, setActiveTab]       = useState("play");
@@ -89,6 +101,7 @@ export default function GamePage() {
 
     let cancelled = false;
     const requestId = ++moveRequestId.current;
+    const sanLen = sanList.length;
 
     getStockfishMove(board, "b", engineRating).then((move) => {
       // Ignore if a newer request was started or the effect was cleaned up.
@@ -96,10 +109,13 @@ export default function GamePage() {
 
       if (move) {
         const isCapture = Boolean(board[move.tr][move.tc]);
+        const san = moveToSan(board, move, gameState, getLegalMovesWithRules);
+        const uci = moveToUci(move);
         const { board: nextBoard, gameState: nextGS } =
           applyMoveWithRules(board, move, gameState);
         const nextStatus = getGameStatus(nextBoard, "w", nextGS);
         const nextLastMove = [{ r: move.r, c: move.c }, { r: move.tr, c: move.tc }];
+        const fenAfter = boardToFen(nextBoard, "w", nextGS, 0, Math.floor((sanLen + 1) / 2) + 1);
 
         // Sound
         if (nextStatus === "checkmate") playCheckmate();
@@ -116,12 +132,15 @@ export default function GamePage() {
         setStatus(nextStatus);
         setNavHistory(prev => [...prev, { board: nextBoard, lastMove: nextLastMove }]);
         setNavIndex(prev => prev + 1);
+        setSanList(prev => [...prev, san]);
+        setUciList(prev => [...prev, uci]);
+        setFenList(prev => [...prev, fenAfter]);
       }
       setTurn("w");
     });
 
     return () => { cancelled = true; };
-  }, [turn, board, engineRating, gameState, status]);
+  }, [turn, board, engineRating, gameState, status, sanList.length]);
 
   // ── Fetch analysis whenever the position changes ───────────────────────────
   useEffect(() => {
@@ -153,6 +172,12 @@ export default function GamePage() {
     setHistoryStack([]);
     setNavHistory([{ board: START.map(r => [...r]), lastMove: null }]);
     setNavIndex(0);
+    setSanList([]);
+    setUciList([]);
+    setFenList([]);
+    startedAtRef.current = new Date().toISOString();
+    savedRef.current = false;
+    setSaveStatus(null);
     setAriaMsg("Game reset");
     playGameStart();
   }, []);
@@ -178,6 +203,11 @@ export default function GamePage() {
       setSelected(null);
       setMovesFromSquare([]);
       setAnalysis(null);
+      setSanList(snap.sanList ?? []);
+      setUciList(snap.uciList ?? []);
+      setFenList(snap.fenList ?? []);
+      savedRef.current = false;
+      setSaveStatus(null);
       // Trim navHistory to match restored position (snap.history.length half-moves)
       const trimTo = snap.history.length + 1;
       setNavHistory(prev => prev.slice(0, trimTo));
@@ -189,6 +219,35 @@ export default function GamePage() {
   function colorName(color) {
     return color === "w" ? "White" : "Black";
   }
+
+  // Save the game when it ends (checkmate/stalemate). One-shot via savedRef.
+  useEffect(() => {
+    if (savedRef.current) return;
+    if (status !== "checkmate" && status !== "stalemate") return;
+    savedRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSaveStatus("saving");
+    const winner = status === "checkmate" ? (turn === "w" ? "b" : "w") : null;
+    const result = status === "stalemate" ? "1/2-1/2" : (winner === "w" ? "1-0" : "0-1");
+    saveFinishedGame({
+      user,
+      type: "vs-engine",
+      result,
+      termination: status,
+      startedAt: startedAtRef.current,
+      whiteName: user?.username || "Guest",
+      blackName: `Stockfish ${engineRating}`,
+      userColor: "w",
+      engineRating,
+      sanMoves: sanList,
+      uciMoves: uciList,
+      fenAfterByPly: fenList,
+    }).then((r) => {
+      if (r.skipped) setSaveStatus(null);
+      else if (r.ok) setSaveStatus("saved");
+      else setSaveStatus("error");
+    });
+  }, [status, turn, user, engineRating, sanList, uciList, fenList]);
 
   // ── Square click handler ───────────────────────────────────────────────────
   function onSquareClick(r, c) {
@@ -206,11 +265,15 @@ export default function GamePage() {
     const chosenMove = movesFromSquare.find(m => m.tr === r && m.tc === c);
     if (selected && chosenMove) {
       const isCapture = Boolean(board[chosenMove.tr][chosenMove.tc]);
-      const snapshot = { board, turn, gameState, status, history, lastMove };
+      const snapshot = { board, turn, gameState, status, history, lastMove,
+                         sanList, uciList, fenList };
+      const san = moveToSan(board, chosenMove, gameState, getLegalMovesWithRules);
+      const uci = moveToUci(chosenMove);
       const { board: nextBoard, gameState: nextGameState } =
         applyMoveWithRules(board, chosenMove, gameState);
       const nextStatus = getGameStatus(nextBoard, "b", nextGameState);
       const nextLastMove = [{ r: chosenMove.r, c: chosenMove.c }, { r: chosenMove.tr, c: chosenMove.tc }];
+      const fenAfter = boardToFen(nextBoard, "b", nextGameState, 0, Math.floor((sanList.length + 1) / 2) + 1);
 
       // Sound
       if (nextStatus === "checkmate") playCheckmate();
@@ -231,6 +294,9 @@ export default function GamePage() {
       setMovesFromSquare([]);
       setNavHistory(prev => [...prev, { board: nextBoard, lastMove: nextLastMove }]);
       setNavIndex(prev => prev + 1);
+      setSanList(prev => [...prev, san]);
+      setUciList(prev => [...prev, uci]);
+      setFenList(prev => [...prev, fenAfter]);
       return;
     }
 
@@ -414,6 +480,9 @@ export default function GamePage() {
 
       <div className="game-controls">
         <span className="turn-pill">{isGameOver ? "🏁" : status === "check" ? "⚠️" : "⏱"} {turnLabel}</span>
+        {saveStatus === "saving" && <span className="status-pill">💾 Saving…</span>}
+        {saveStatus === "saved" && <span className="status-pill">✅ Saved</span>}
+        {saveStatus === "error" && <span className="status-pill">⚠️ Save failed</span>}
         <button
           className="btn btn-sm btn-outline"
           onClick={undoMove}

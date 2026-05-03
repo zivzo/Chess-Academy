@@ -1,5 +1,5 @@
 // ── Local 2-player game page ──────────────────────────────────────────────────
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PIECES,
   createInitialBoard,
@@ -17,6 +17,9 @@ import {
   playGameStart,
   playNavStep,
 } from "../utils/chessSound.js";
+import { boardToFen, moveToUci, moveToSan } from "../utils/chessFen.js";
+import { saveFinishedGame } from "../utils/saveGame.js";
+import { useAuth } from "../utils/useAuth.js";
 
 const FILES = "abcdefgh";
 
@@ -32,6 +35,7 @@ function buildAnnouncement(toR, toC, isCapture, status, colorName) {
 }
 
 export default function LocalGamePage() {
+  const { user } = useAuth();
   const [board, setBoard] = useState(() => createInitialBoard());
   const [turn, setTurn] = useState("w");
   const [selected, setSelected] = useState(null);
@@ -46,9 +50,44 @@ export default function LocalGamePage() {
   const [viewIndex, setViewIndex] = useState(0);
   const [ariaMsg, setAriaMsg] = useState("");
 
+  // Recorded move list (parallel to historyStack) — used to save the game.
+  const [sanList, setSanList] = useState([]);
+  const [uciList, setUciList] = useState([]);
+  const [fenList, setFenList] = useState([]);
+  const startedAtRef = useRef(new Date().toISOString());
+  const savedRef = useRef(false);
+  const [saveStatus, setSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
+
   function colorName(color) {
     return color === "w" ? "White" : "Black";
   }
+
+  // Save the game when it ends (checkmate/stalemate). One-shot via savedRef.
+  useEffect(() => {
+    if (savedRef.current) return;
+    if (status !== "checkmate" && status !== "stalemate") return;
+    savedRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSaveStatus("saving");
+    const winner = status === "checkmate" ? (turn === "w" ? "b" : "w") : null;
+    const result = status === "stalemate" ? "1/2-1/2" : (winner === "w" ? "1-0" : "0-1");
+    saveFinishedGame({
+      user,
+      type: "local",
+      result,
+      termination: status,
+      startedAt: startedAtRef.current,
+      whiteName: user?.username || "Guest",
+      blackName: user?.username || "Guest",
+      sanMoves: sanList,
+      uciMoves: uciList,
+      fenAfterByPly: fenList,
+    }).then((r) => {
+      if (r.skipped) setSaveStatus(null);
+      else if (r.ok) setSaveStatus("saved");
+      else setSaveStatus("error");
+    });
+  }, [status, turn, user, sanList, uciList, fenList]);
 
   function reset() {
     setBoard(createInitialBoard());
@@ -61,6 +100,12 @@ export default function LocalGamePage() {
     setHistoryStack([]);
     setDraggingSquare(null);
     setViewIndex(0);
+    setSanList([]);
+    setUciList([]);
+    setFenList([]);
+    startedAtRef.current = new Date().toISOString();
+    savedRef.current = false;
+    setSaveStatus(null);
     setAriaMsg("Game reset");
     playGameStart();
   }
@@ -77,6 +122,13 @@ export default function LocalGamePage() {
       setSelected(null);
       setLegalMoves([]);
       setViewIndex(0); // snap to new live position
+      // Roll back recorded notation lists too.
+      setSanList(s => s.slice(0, -1));
+      setUciList(s => s.slice(0, -1));
+      setFenList(s => s.slice(0, -1));
+      // Allow saving again if we'd already saved a finished game.
+      savedRef.current = false;
+      setSaveStatus(null);
       return prevStack.slice(0, -1);
     });
   }
@@ -99,10 +151,14 @@ export default function LocalGamePage() {
     if (selected && selectedMove) {
       const isCapture = Boolean(board[selectedMove.tr][selectedMove.tc]);
       const snapshot = { board, turn, gameState, status, lastMove };
+      // Compute SAN before mutating so disambiguation sees the original board.
+      const san = moveToSan(board, selectedMove, gameState, getLegalMovesWithRules);
+      const uci = moveToUci(selectedMove);
       const { board: nextBoard, gameState: nextGameState } =
         applyMoveWithRules(board, selectedMove, gameState);
       const nextTurn = turn === "w" ? "b" : "w";
       const nextStatus = getGameStatus(nextBoard, nextTurn, nextGameState);
+      const fenAfter = boardToFen(nextBoard, nextTurn, nextGameState, 0, Math.floor((sanList.length + 1) / 2) + 1);
 
       // Sound feedback
       if (nextStatus === "checkmate") playCheckmate();
@@ -124,6 +180,9 @@ export default function LocalGamePage() {
       setLegalMoves([]);
       setTurn(nextTurn);
       setStatus(nextStatus);
+      setSanList(prev => [...prev, san]);
+      setUciList(prev => [...prev, uci]);
+      setFenList(prev => [...prev, fenAfter]);
       return;
     }
 
@@ -270,6 +329,9 @@ export default function LocalGamePage() {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
           <span className="status-pill">{isGameOver ? "🏁" : status === "check" ? "⚠️" : "⏱"} {turnLabel}</span>
+          {saveStatus === "saving" && <span className="status-pill">💾 Saving…</span>}
+          {saveStatus === "saved" && <span className="status-pill">✅ Saved to your history</span>}
+          {saveStatus === "error" && <span className="status-pill">⚠️ Save failed</span>}
           <button className="btn btn-outline btn-sm" onClick={undoMove} disabled={historyStack.length === 0}>↶ Undo</button>
           <button className="btn btn-outline btn-sm" onClick={reset}>Reset</button>
         </div>

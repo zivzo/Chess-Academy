@@ -398,5 +398,118 @@ export default function GlobalStyles() { return (
       font-size: 0.72rem; color: var(--gold); font-weight: 600;
       text-align: center; margin-top: 0.3rem; letter-spacing: 0.2px;
     }
+
+    /* ── Auth + form controls ── */
+    .auth-shell {
+      max-width: 420px; margin: 2rem auto; background: white;
+      border: 1px solid var(--border); border-radius: 12px; padding: 2rem;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.06);
+    }
+    .form-row { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+    .form-row label { font-size: 0.78rem; font-weight: 600; color: var(--brown); letter-spacing: 0.3px; }
+    .form-row input, .form-row select, .form-row textarea {
+      font: inherit; font-size: 0.9rem; padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border); border-radius: 8px; background: var(--cream);
+      color: var(--dark); outline: none; transition: border-color 0.15s;
+    }
+    .form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--gold); }
+    .form-error {
+      background: #FDE8E8; color: #8A1F1F; border: 1px solid #f1bcbc;
+      border-radius: 8px; padding: 0.5rem 0.7rem; font-size: 0.82rem; margin-bottom: 0.9rem;
+    }
+    .form-link {
+      background: none; border: none; color: var(--gold); cursor: pointer;
+      font: inherit; font-size: 0.82rem; padding: 0; text-decoration: underline;
+    }
+    .auth-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.5rem; }
+
+    /* ── Header user menu ── */
+    .header-user {
+      display: flex; align-items: center; gap: 0.5rem; margin-left: 0.6rem;
+      padding-left: 0.8rem; border-left: 1px solid rgba(255,255,255,0.12);
+    }
+    .header-user-name {
+      font-size: 0.82rem; color: var(--cream); font-weight: 600;
+      max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .header-user-btn {
+      background: none; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px;
+      color: #C8B99A; cursor: pointer; padding: 0.35rem 0.7rem; font-size: 0.78rem;
+      font-family: inherit; transition: all 0.15s;
+    }
+    .header-user-btn:hover { background: rgba(255,255,255,0.08); color: var(--cream); }
+    .header-user-btn.primary { background: var(--gold); border-color: var(--gold); color: var(--brown); font-weight: 700; }
+    .header-user-btn.primary:hover { background: var(--gold-light); }
+
+    /* ── Tables (My Games) ── */
+    .games-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; background: white; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .games-table th, .games-table td { padding: 0.55rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+    .games-table th { background: var(--ivory); font-size: 0.74rem; font-weight: 600; letter-spacing: 0.5px; color: var(--muted); text-transform: uppercase; }
+    .games-table tr:last-child td { border-bottom: none; }
+    .games-table tr.row-clickable { cursor: pointer; transition: background 0.12s; }
+    .games-table tr.row-clickable:hover { background: rgba(200,150,62,0.08); }
+    .result-pill { display: inline-block; font-family: 'DM Mono', monospace; font-size: 0.78rem; font-weight: 700; padding: 1px 8px; border-radius: 6px; }
+    .result-w { background: #E8F4EC; color: #2E6B42; }
+    .result-l { background: #FDE8E8; color: #8A1F1F; }
+    .result-d { background: #FFF4E0; color: #8A5A00; }
+    .filter-row { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+    .pager { display: flex; gap: 0.4rem; align-items: center; margin-top: 0.8rem; justify-content: flex-end; }
+
+    /* ── Online clocks ── */
+    .clock {
+      font-family: 'DM Mono', monospace; font-size: 1.6rem; font-weight: 700;
+      background: var(--brown); color: var(--cream); padding: 0.4rem 0.9rem;
+      border-radius: 8px; letter-spacing: 1px; min-width: 110px; text-align: center;
+      border: 2px solid transparent;
+    }
+    .clock.active { border-color: var(--gold); background: var(--gold); color: var(--brown); }
+    .clock.low { color: #ffb4b4; }
+    .clock.active.low { background: #ffe2e2; color: #8A1F1F; border-color: #c14b4b; }
+
+    .player-strip {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.8rem; padding: 0.5rem 0.8rem; background: white; border: 1px solid var(--border);
+      border-radius: 8px; margin-bottom: 0.4rem;
+    }
+    .player-name { font-weight: 600; color: var(--brown); font-size: 0.9rem; }
+
+    /* ── Lobby ── */
+    .lobby-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    @media (max-width: 800px) { .lobby-grid { grid-template-columns: 1fr; } }
+    .lobby-list { background: white; border: 1px solid var(--border); border-radius: 10px; max-height: 420px; overflow-y: auto; }
+    .lobby-row { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border); font-size: 0.86rem; }
+    .lobby-row:last-child { border-bottom: none; }
+    .lobby-empty { padding: 1rem; color: var(--muted); font-size: 0.85rem; text-align: center; }
+
+    /* ── Chat ── */
+    .chat-box { background: white; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; height: 200px; }
+    .chat-log { flex: 1; padding: 0.5rem; overflow-y: auto; font-size: 0.82rem; }
+    .chat-msg { padding: 0.15rem 0; }
+    .chat-msg .who { font-weight: 700; color: var(--brown); margin-right: 0.3rem; }
+    .chat-input { display: flex; border-top: 1px solid var(--border); }
+    .chat-input input { flex: 1; border: none; padding: 0.5rem 0.7rem; font: inherit; font-size: 0.85rem; outline: none; background: transparent; }
+    .chat-input button { border: none; background: var(--brown); color: var(--cream); padding: 0 0.9rem; cursor: pointer; }
+    .chat-input button:hover { background: var(--gold); color: var(--brown); }
+
+    /* ── Eval graph ── */
+    .eval-graph { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; margin-bottom: 0.6rem; }
+    .eval-graph svg { width: 100%; height: 60px; display: block; }
+    .ply-marker { cursor: pointer; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal {
+      background: white; border-radius: 12px; padding: 1.5rem 1.75rem; max-width: 420px;
+      width: 90%; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    }
+    .modal h3 { font-family: 'Playfair Display', serif; color: var(--brown); margin-bottom: 0.5rem; }
+    .modal .actions { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end; }
+
+    /* ── Notes panel ── */
+    .notes-panel textarea { width: 100%; min-height: 80px; resize: vertical; font: inherit; font-size: 0.85rem; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 6px; background: var(--cream); }
+    .notes-saved { font-size: 0.7rem; color: var(--green); margin-top: 0.25rem; }
   `}</style>
 ); }

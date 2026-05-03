@@ -1,7 +1,13 @@
 Chess Academy - Run Locally in Visual Studio Code
 
+The project is a monorepo with two workspaces:
+  web/     - the React + Vite frontend (SPA)
+  server/  - the Node/Express + WebSocket + LowDB backend
+             (handles auth, saved games, post-game analysis notes,
+             and live online games with chess clocks)
+
 1) Install prerequisites
-- Install Node.js (v18 or newer): https://nodejs.org
+- Install Node.js (v20 or newer): https://nodejs.org
 - Install Visual Studio Code: https://code.visualstudio.com
 
 2) Open this project in VS Code
@@ -9,33 +15,38 @@ Chess Academy - Run Locally in Visual Studio Code
 - Select: /home/runner/work/Chess-Academy/Chess-Academy
 - Open a terminal in VS Code (Terminal -> New Terminal)
 
-3) Verify the repository tests
-- Run:
-  npm test
-
-4) Create a small React app shell (one-time setup)
+3) Install all dependencies (root + server + web)
 - From the repository root, run:
-  npm create vite@latest web -- --template react
-  cd web
-  npm install
+    npm run install:all
 
-5) Copy Chess Academy source files into the React app
-- Copy these files from repo root into web/src:
-  - chess-academy.jsx
-  - chess-core.js
+4) Verify the repository tests
+- From the repository root, run:
+    npm test
 
-6) Replace web/src/App.jsx with:
+5) Start both backend and frontend in dev mode
+- From the repository root, run:
+    npm run dev
+  This starts:
+    - the API + WebSocket server on http://localhost:3001
+    - the Vite dev server on   http://localhost:5173
+  Vite proxies /api and /ws to the backend so you only need to open
+  http://localhost:5173 in your browser.
 
-import ChessAcademy from "./chess-academy.jsx";
+6) (Optional) Run only one workspace
+- Backend only:   npm run dev:server
+- Frontend only:  npm run dev:web
 
-export default function App() {
-  return <ChessAcademy />;
-}
+7) Production build of the frontend
+- From the repository root, run:
+    npm run build
+  Output is written to web/dist/. Serve it behind any static host;
+  point /api and /ws at the running backend.
 
-7) Start the app
-- In the web folder, run:
-  npm run dev
-- Open the local URL shown in terminal (usually http://localhost:5173)
+8) Data storage
+- The backend stores everything in server/db.json (LowDB).
+  The file is created automatically on first run.
+- A daily backup is written to server/db.json.bak.YYYY-MM-DD on startup.
+- db.json and *.bak are gitignored.
 
-8) Optional: stop the app
-- Press Ctrl + C in the VS Code terminal
+9) Stop the app
+- Press Ctrl + C in the VS Code terminal that started npm run dev.
