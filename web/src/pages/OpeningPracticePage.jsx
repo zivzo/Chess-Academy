@@ -86,7 +86,7 @@ export default function OpeningPracticePage({ opening, onBack }) {
   const [legalMoves, setLegalMoves] = useState([]);
   const [lastMove, setLastMove] = useState(null);
   const [feedback, setFeedback] = useState(null); // { type, text }
-  const [showHint, setShowHint] = useState(false);
+  const [hintLevel, setHintLevel] = useState(0); // 0 = none, 1 = piece only, 2 = full move
   const [ariaMsg, setAriaMsg] = useState("");
   const opponentTimerRef = useRef(null);
 
@@ -102,7 +102,7 @@ export default function OpeningPracticePage({ opening, onBack }) {
     setLegalMoves([]);
     setLastMove(null);
     setFeedback(null);
-    setShowHint(false);
+    setHintLevel(0);
     setAriaMsg("");
   }
 
@@ -114,7 +114,7 @@ export default function OpeningPracticePage({ opening, onBack }) {
     setLegalMoves([]);
     setLastMove(null);
     setFeedback(null);
-    setShowHint(false);
+    setHintLevel(0);
     setAriaMsg("Practice reset");
     playGameStart();
   }
@@ -146,7 +146,7 @@ export default function OpeningPracticePage({ opening, onBack }) {
         { r: bookMove.tr, c: bookMove.tc },
       ]);
       setStep((s) => s + 1);
-      setShowHint(false);
+      setHintLevel(0);
       const san = line.moves[step] ?? "";
       setAriaMsg(`Opponent plays ${san}`);
     }, 450);
@@ -169,16 +169,15 @@ export default function OpeningPracticePage({ opening, onBack }) {
       applyMoveWithRules(board, move, gameState);
 
     if (!boardsEqual(nextBoard, expected)) {
-      // Not the book move — reject and give feedback.
+      // Not the book move — reject without revealing the answer.
       playIllegal();
-      const expectedSan = line.moves[step] ?? "the book move";
       setFeedback({
         type: "error",
-        text: `Not the book move. The main line plays ${expectedSan}. Try again, or click "Show hint".`,
+        text: `That's not the book move. Try again — or click "Show hint" if you're stuck.`,
       });
       setSelected(null);
       setLegalMoves([]);
-      setAriaMsg(`Incorrect — book move is ${expectedSan}`);
+      setAriaMsg("Incorrect — try again");
       return;
     }
 
@@ -194,7 +193,7 @@ export default function OpeningPracticePage({ opening, onBack }) {
     setStep((s) => s + 1);
     setSelected(null);
     setLegalMoves([]);
-    setShowHint(false);
+    setHintLevel(0);
     const san = line.moves[step] ?? "";
     if (step + 1 >= totalMoves) {
       setFeedback({
@@ -274,27 +273,42 @@ export default function OpeningPracticePage({ opening, onBack }) {
   }
 
   // ── Hint highlight squares ────────────────────────────────────────────────
+  // hintLevel 0 = no hint, 1 = highlight piece to move, 2 = reveal full move
   const hintSquares = useMemo(() => {
-    if (!showHint || !bookMove || !isUserTurn) return [];
+    if (!bookMove || !isUserTurn || hintLevel === 0) return [];
+    if (hintLevel === 1) return [[bookMove.r, bookMove.c]];
     return [
       [bookMove.r, bookMove.c],
       [bookMove.tr, bookMove.tc],
     ];
-  }, [showHint, bookMove, isUserTurn]);
+  }, [hintLevel, bookMove, isUserTurn]);
 
   const onShowHint = useCallback(() => {
     if (!isUserTurn || !bookMove) return;
-    setShowHint(true);
     playNavStep();
-    const from = squareLabel(bookMove.r, bookMove.c);
-    const to = squareLabel(bookMove.tr, bookMove.tc);
-    const san = line.moves[step] ?? "";
-    setFeedback({
-      type: "hint",
-      text: `Hint: play ${san} (${from} → ${to}).`,
-    });
-    setAriaMsg(`Hint: ${san}`);
-  }, [isUserTurn, bookMove, line.moves, step]);
+    if (hintLevel === 0) {
+      const piece = board[bookMove.r][bookMove.c];
+      const pieceNames = { K: "king", Q: "queen", R: "rook", B: "bishop", N: "knight", P: "pawn" };
+      const pieceName = pieceNames[piece?.[1]] ?? "piece";
+      const from = squareLabel(bookMove.r, bookMove.c);
+      setHintLevel(1);
+      setFeedback({
+        type: "hint",
+        text: `Hint: move your ${pieceName} on ${from}. Click "Show hint" again to reveal the full move.`,
+      });
+      setAriaMsg(`Hint: move your ${pieceName} on ${from}`);
+    } else {
+      const from = squareLabel(bookMove.r, bookMove.c);
+      const to = squareLabel(bookMove.tr, bookMove.tc);
+      const san = line.moves[step] ?? "";
+      setHintLevel(2);
+      setFeedback({
+        type: "hint",
+        text: `Hint: play ${san} (${from} → ${to}).`,
+      });
+      setAriaMsg(`Hint: ${san}`);
+    }
+  }, [isUserTurn, bookMove, board, hintLevel, line.moves, step]);
 
   // ── Status pill text ──────────────────────────────────────────────────────
   let statusText;
@@ -327,8 +341,9 @@ export default function OpeningPracticePage({ opening, onBack }) {
             type="button"
             className="btn btn-outline btn-sm"
             onClick={onShowHint}
-            disabled={!isUserTurn || !bookMove || isComplete}
-          >💡 Show hint</button>
+            disabled={!isUserTurn || !bookMove || isComplete || hintLevel >= 2}
+            title={hintLevel === 0 ? "Highlight which piece to move" : hintLevel === 1 ? "Reveal the full book move" : "Hint already revealed"}
+          >💡 {hintLevel === 0 ? "Show hint" : hintLevel === 1 ? "Reveal move" : "Hint shown"}</button>
           <button className="btn btn-outline btn-sm" onClick={reset}>Reset</button>
         </div>
       </div>
@@ -463,7 +478,7 @@ export default function OpeningPracticePage({ opening, onBack }) {
             <ul style={{paddingLeft:"1.2rem",fontSize:"0.82rem",color:"#4A3F35",lineHeight:"1.7"}}>
               <li>Drag or click a piece to make your move when it’s your turn.</li>
               <li>If your move matches the opening theory, the system plays the reply automatically.</li>
-              <li>Stuck? Press <strong>💡 Show hint</strong> to reveal the book move.</li>
+              <li>Stuck? Press <strong>💡 Show hint</strong> once to highlight the piece to move; press it again to reveal the full book move.</li>
               <li>Press <strong>Reset</strong> to start the line over.</li>
             </ul>
           </div>
