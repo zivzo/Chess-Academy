@@ -4,6 +4,24 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "test:core": "node --test tests/"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/ui": "^1.6.0",
+    "@testing-library/react": "^14.3.1",
+    "@testing-library/jest-dom": "^6.4.6",
+    "jsdom": "^24.1.0",
+    "vite": "^5.2.13",
+    "vitest": "^1.6.0"
   }
 }
