@@ -1,0 +1,64 @@
+CHESS ACADEMY — PRODUCTION CHECKLIST
+
+Build and hosting
+1. Use Node.js 24 LTS. In web/, run npm ci, then npm run build.
+   From the repository root, npm test runs the existing Node test suite.
+   In web/, npm run lint runs the existing ESLint checks.
+2. Copy web/.env.example to web/.env.local for local builds, or set those
+   variables in your hosting dashboard. All VITE_ values are public; never
+   put credentials there. Rebuild after changing them.
+3. Set VITE_SITE_URL to your final HTTPS origin, with no subdirectory,
+   query or fragment. The build generates canonical metadata, structured
+   WebSite data, robots.txt and a homepage sitemap for that origin.
+4. Connect this repository to Netlify: netlify.toml configures the build,
+   output directory and basic security headers. Other static hosts can
+   serve web/dist at the domain root. Use HTTPS and redirect alternate
+   domains to the canonical domain. Preview deployments should be blocked
+   from indexing with the host's authentication or X-Robots-Tag settings.
+5. Check all chess sections on desktop and mobile, external engine access,
+   the browser console, and privacy controls on the deployed origin.
+
+Google Analytics 4
+- Create a GA4 web data stream and set VITE_GA_ID to its G- measurement ID.
+- No analytics requests are made until the visitor opts in. Local development
+  does not load analytics or ads. Invalid or empty IDs disable integration.
+- Section and opening changes send manual page_view events, without game
+  content or user identifiers. Disable GA4 Enhanced Measurement's automatic
+  page views/history tracking to avoid duplicate SPA views.
+- Verify accepted visits in GA4 Realtime. Rejected visits should not appear.
+  Google Analytics measures traffic; it does not rate sites or improve rankings.
+
+AdSense
+- Obtain Google's site approval, a ca-pub- publisher ID and TWO display ad
+  unit IDs. Configure VITE_ADSENSE_CLIENT_ID, VITE_ADSENSE_LEFT_SLOT and
+  VITE_ADSENSE_RIGHT_SLOT. Use units supporting 160 x 600 display ads.
+- Left and right rails appear at viewport widths of 1500px and above, outside
+  the learning controls. Narrow screens hide them and do not request new ads.
+  Hidden rails do not undo requests already made at a wider viewport.
+- Empty settings or rejected consent show labeled advertising space, not live
+  ads. An unapproved account or an ad blocker must not prevent chess use.
+- Download the exact ads.txt entry supplied by your AdSense account, place
+  it in web/public/ads.txt and rebuild. Do not invent a publisher ID.
+- BEFORE enabling ads, review Google's current publisher/consent policies.
+  Deploy a Google-certified CMP where required (including EEA, UK and
+  Switzerland), and connect its signals to the ad-loading permission.
+  The included opt-in controls are a technical gate, NOT a certified CMP
+  or a substitute for jurisdiction-specific legal review.
+
+Privacy and search launch gates
+- Publish an operator-specific privacy policy and contact information before
+  collecting data. Include Google services, cookies, retention, user rights,
+  international transfers and external fonts/engine requests. Configure GA
+  retention and Google account settings appropriately.
+- Privacy settings allow rejecting optional services or opting into analytics
+  alone. Withdrawing permission reloads the page to stop loaded scripts; it
+  does not delete historical data or existing Google cookies.
+- Verify domain ownership in Google Search Console; submit /sitemap.xml and
+  inspect the homepage URL. Test mobile usability, PageSpeed Insights and
+  Core Web Vitals using the deployed site. Monitor Search Console regularly.
+- Current lessons use client-side state, so only the homepage is in the sitemap.
+  Individually indexable lessons require real URLs and rendered/prerendered
+  lesson content before expanding the sitemap.
+- Grow useful original lessons and reputable links. Neither these technical
+  improvements nor Analytics can guarantee placement beside Lichess or
+  Chess.com; Google controls indexing, ranking and AdSense approval.
