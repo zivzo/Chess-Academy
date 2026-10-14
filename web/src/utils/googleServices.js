@@ -1,6 +1,10 @@
 export const CONSENT_KEY = "chess-academy-privacy";
 
 export function readConsent() {
+  if (typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("privacy") === "denied") {
+    return { analytics: false, ads: false };
+  }
   try {
     const saved = JSON.parse(localStorage.getItem(CONSENT_KEY));
     if (typeof saved?.analytics === "boolean" && typeof saved?.ads === "boolean") {

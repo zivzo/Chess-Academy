@@ -53,6 +53,8 @@ Privacy and search launch gates
 - Privacy settings allow rejecting optional services or opting into analytics
   alone. Withdrawing permission reloads the page to stop loaded scripts; it
   does not delete historical data or existing Google cookies.
+  Saved choices synchronize across open tabs. If saving a withdrawal fails,
+  the reload uses a privacy=denied URL override instead of stale permission.
 - Verify domain ownership in Google Search Console; submit /sitemap.xml and
   inspect the homepage URL. Test mobile usability, PageSpeed Insights and
   Core Web Vitals using the deployed site. Monitor Search Console regularly.

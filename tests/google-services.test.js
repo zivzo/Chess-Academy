@@ -68,6 +68,12 @@ test("analytics is disabled without an ID and loads once with manual section vie
   assert.equal(window.dataLayer.find(args => args[0] === "config")[2].send_page_view, false);
 });
 
+test("withdrawal URL override denies stale stored consent", t => {
+  browser(t);
+  window.location.search = "?privacy=denied";
+  assert.deepEqual(readConsent(), { analytics: false, ads: false });
+});
+
 test("ads skip disconnected, hidden and cancelled slots and do not initialize twice", t => {
   const scripts = browser(t);
   const config = googleConfig({ VITE_ADSENSE_CLIENT_ID: "ca-pub-1234567890123456" });

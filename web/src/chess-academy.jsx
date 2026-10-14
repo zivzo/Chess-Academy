@@ -69,13 +69,37 @@ export default function ChessAcademy() {
     }
   }, [page, selectedOpening, consent]);
 
-  function saveConsent(next) {
-    try { localStorage.setItem(CONSENT_KEY, JSON.stringify(next)); } catch { /* Keep the choice for this visit. */ }
-    setPrivacyOpen(false);
-    if ((consent?.analytics && !next.analytics) || (consent?.ads && !next.ads)) {
-      // Reload to stop already-loaded third-party scripts after withdrawal.
-      window.location.reload();
+  useEffect(() => {
+    function syncConsent(event) {
+      if (event.key !== CONSENT_KEY && event.key !== null) return;
+      const next = readConsent() || { analytics: false, ads: false };
+      if ((consent?.analytics && !next.analytics) || (consent?.ads && !next.ads)) {
+        window.location.reload();
+        return;
+      }
+      setConsent(next);
     }
+    window.addEventListener("storage", syncConsent);
+    return () => window.removeEventListener("storage", syncConsent);
+  }, [consent]);
+
+  function saveConsent(next) {
+    let persisted = false;
+    try {
+      localStorage.setItem(CONSENT_KEY, JSON.stringify(next));
+      persisted = true;
+    } catch { /* Keep the choice for this visit. */ }
+    setPrivacyOpen(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("privacy");
+    if ((consent?.analytics && !next.analytics) || (consent?.ads && !next.ads)) {
+      // A denied URL override prevents stale stored permission from being restored.
+      if (!persisted) url.searchParams.set("privacy", "denied");
+      // Reload to stop already-loaded third-party scripts after withdrawal.
+      window.location.replace(url.href);
+      return;
+    }
+    window.history.replaceState(null, "", url);
     setConsent(next);
   }
 
