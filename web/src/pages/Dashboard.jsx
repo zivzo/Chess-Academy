@@ -2,7 +2,7 @@
 export default function Dashboard({ onNavigate }) {
   return (
     <div className="fade-in">
-      <div className="page-title">Good morning, Student ♟</div>
+      <h1 className="page-title">Learn chess with Chess Academy ♟</h1>
       <div className="page-subtitle">Your chess journey continues — pick up where you left off.</div>
       <div className="stat-grid">
         {[
@@ -18,7 +18,7 @@ export default function Dashboard({ onNavigate }) {
         ))}
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem",marginBottom:"1.25rem"}}>
+      <div className="dashboard-features">
         <div className="card" style={{cursor:"pointer"}} onClick={() => onNavigate("openings")}>
           <div className="card-title">📖 Opening Library</div>
           <div className="card-body">Study 4 core openings with interactive move-by-move boards, annotations, and key ideas.</div>
