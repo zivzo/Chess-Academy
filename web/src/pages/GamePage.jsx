@@ -105,7 +105,7 @@ export default function GamePage() {
     let cancelled = false;
     const requestId = ++moveRequestId.current;
 
-    getStockfishMove(liveBoard, "b", engineRating).then((move) => {
+    getStockfishMove(liveBoard, "b", engineRating, liveGS).then((move) => {
       if (cancelled || requestId !== moveRequestId.current || !move) return;
 
       const isCapture = Boolean(liveBoard[move.tr][move.tc]);
@@ -139,8 +139,8 @@ export default function GamePage() {
   useEffect(() => {
     let cancelled = false;
     setAnalysis(null);
-    const { board: vBoard, turn: vTurn } = viewedState;
-    getStockfishAnalysis(vBoard, vTurn).then((result) => {
+    const { board: vBoard, turn: vTurn, gameState: vGS } = viewedState;
+    getStockfishAnalysis(vBoard, vTurn, vGS).then((result) => {
       if (!cancelled) setAnalysis(result);
     });
     return () => { cancelled = true; };
