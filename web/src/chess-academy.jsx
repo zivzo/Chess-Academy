@@ -24,9 +24,15 @@ const PAGE_TITLES = {
   quiz: "Chess Knowledge Quiz",
 };
 
-function AdRail({ side, allowed }) {
+const AD_SLOTS = {
+  left: { slot: GOOGLE.leftSlot, className: "ad-rail ad-left", style: { display: "block", width: 160, height: 600 } },
+  right: { slot: GOOGLE.rightSlot, className: "ad-rail ad-right", style: { display: "block", width: 160, height: 600 } },
+  inline: { slot: GOOGLE.inlineSlot, className: "ad-inline", style: { display: "block" }, responsive: true },
+};
+
+function AdSlot({ position, allowed }) {
   const ref = useRef(null);
-  const slot = side === "left" ? GOOGLE.leftSlot : GOOGLE.rightSlot;
+  const { slot, className, style, responsive } = AD_SLOTS[position];
   const enabled = import.meta.env.PROD && allowed && GOOGLE.adsClient && slot;
   useEffect(() => {
     const element = ref.current;
@@ -42,10 +48,12 @@ function AdRail({ side, allowed }) {
     return () => { active = false; observer.disconnect(); cleanup?.(); };
   }, [enabled]);
   return (
-    <aside className={`ad-rail ad-${side}`} aria-label={`${side} advertisement`}>
+    <aside className={className} aria-label={`${position} advertisement`}>
       <div className="ad-label">Advertisement</div>
-      {enabled ? <ins ref={ref} className="adsbygoogle" style={{ display: "block", width: 160, height: 600 }}
-        data-ad-client={GOOGLE.adsClient} data-ad-slot={slot} /> :
+      {enabled ? <ins ref={ref} className="adsbygoogle" style={style}
+        data-ad-client={GOOGLE.adsClient} data-ad-slot={slot}
+        data-ad-format={responsive ? "auto" : undefined}
+        data-full-width-responsive={responsive ? "true" : undefined} /> :
         <div className="ad-placeholder">Advertising space</div>}
     </aside>
   );
@@ -153,7 +161,7 @@ export default function ChessAcademy() {
         </header>
 
         <div className="site-layout">
-          <AdRail side="left" allowed={consent?.ads} />
+          <AdSlot position="left" allowed={consent?.ads} />
           <div className="main">
           {/* Sidebar */}
           <aside className="sidebar">
@@ -222,8 +230,9 @@ export default function ChessAcademy() {
             {page==="quiz" && <QuizPage />}
           </main>
           </div>
-          <AdRail side="right" allowed={consent?.ads} />
+          <AdSlot position="right" allowed={consent?.ads} />
         </div>
+        <AdSlot position="inline" allowed={consent?.ads} />
         <footer className="site-footer">
           <span>Chess Academy — learn, practice, improve.</span>
           <button className="btn btn-outline btn-sm" onClick={() => setPrivacyOpen(v => !v)}

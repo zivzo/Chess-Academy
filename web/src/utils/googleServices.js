@@ -22,7 +22,13 @@ export function googleConfig(env) {
     adsClient: /^ca-pub-\d{16}$/.test(env.VITE_ADSENSE_CLIENT_ID || "") ? env.VITE_ADSENSE_CLIENT_ID : "",
     leftSlot: /^\d+$/.test(env.VITE_ADSENSE_LEFT_SLOT || "") ? env.VITE_ADSENSE_LEFT_SLOT : "",
     rightSlot: /^\d+$/.test(env.VITE_ADSENSE_RIGHT_SLOT || "") ? env.VITE_ADSENSE_RIGHT_SLOT : "",
+    inlineSlot: /^\d+$/.test(env.VITE_ADSENSE_INLINE_SLOT || "") ? env.VITE_ADSENSE_INLINE_SLOT : "",
   };
+}
+
+// Google's standard ads.txt record for an AdSense publisher (ca-pub-… → pub-…).
+export function adsTxt(config) {
+  return config.adsClient ? `google.com, ${config.adsClient.slice(3)}, DIRECT, f08c47fec0942fa0\n` : "";
 }
 
 function loadScript(id, src) {
