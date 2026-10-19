@@ -181,6 +181,7 @@ export default function GlobalStyles() { return (
       display: grid; grid-template-columns: repeat(8, 72px); grid-template-rows: repeat(8, 72px);
       border: 3px solid var(--brown); border-radius: 6px; overflow: hidden;
       box-shadow: 0 12px 40px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.12);
+      position: relative;
     }
     .sq {
       width: 72px; height: 72px;
@@ -218,6 +219,23 @@ export default function GlobalStyles() { return (
     .sq.piece-grabbable:active { cursor: grabbing; }
     .sq.selectable { cursor: pointer; }
     .sq:hover { filter: brightness(1.06); }
+
+    /* ── Right-click annotations (square marks & arrows) ── */
+    .sq.marked { isolation: isolate; }
+    .sq.marked::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(235, 97, 80, 0.8);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .board-annotations {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 2;
+    }
+    .board-arrow { fill: rgba(255, 170, 0, 0.8); }
+    .board-arrow.preview { fill: rgba(255, 170, 0, 0.55); }
 
     /* ── Move list ── */
     .move-list-wrap { flex: 1; min-width: 200px; }

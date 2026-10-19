@@ -26,6 +26,9 @@ import {
   playGameStart,
   playNavStep,
 } from "../utils/chessSound.js";
+import { useBoardAnnotations } from "../utils/useBoardAnnotations.js";
+import { hasSquare } from "../utils/boardAnnotations.js";
+import BoardAnnotationsOverlay from "../components/BoardAnnotationsOverlay.jsx";
 
 const FILES = "abcdefgh";
 
@@ -336,6 +339,7 @@ export default function GamePage() {
   // ── Derive view state ──────────────────────────────────────────────────────
   const viewBoard = navHistory[navIndex]?.board ?? board;
   const viewLastMove = navHistory[navIndex]?.lastMove ?? lastMove;
+  const annotations = useBoardAnnotations(viewBoard);
 
   // ── Derived values ─────────────────────────────────────────────────────────
   const isGameOver = status === "checkmate" || status === "stalemate";
@@ -437,7 +441,7 @@ export default function GamePage() {
             <div style={{display:"flex",flexDirection:"column"}}>
               {[8,7,6,5,4,3,2,1].map(r => <div key={r} className="board-rank-label">{r}</div>)}
             </div>
-            <div className="board">
+            <div className="board" {...annotations.boardHandlers}>
               {viewBoard.map((row, ri) =>
                 row.map((piece, ci) => {
                   const isLight = (ri + ci) % 2 === 0;
@@ -458,6 +462,7 @@ export default function GamePage() {
                     canInteract && isWhitePiece && "piece-grabbable",
                     isDragging && "dragging",
                     isInCheck && "in-check",
+                    hasSquare(annotations.squares, ri, ci) && "marked",
                   ].filter(Boolean).join(" ");
                   return (
                     <div
@@ -475,6 +480,7 @@ export default function GamePage() {
                   );
                 })
               )}
+              <BoardAnnotationsOverlay arrows={annotations.arrows} preview={annotations.preview} />
             </div>
           </div>
           {/* Navigation buttons + move counter */}
@@ -564,6 +570,9 @@ export default function GamePage() {
               Use <strong>← →</strong> arrow keys to step through moves.
             </div>
           )}
+          <div style={{fontSize:"0.75rem",color:"var(--muted)",marginTop:"0.3rem"}}>
+            Right-click a square to highlight it, or right-click and drag to draw an arrow. Left-click the board to clear them.
+          </div>
         </div>
       </div>
     </div>

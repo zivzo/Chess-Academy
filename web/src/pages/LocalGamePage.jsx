@@ -17,6 +17,9 @@ import {
   playGameStart,
   playNavStep,
 } from "../utils/chessSound.js";
+import { useBoardAnnotations } from "../utils/useBoardAnnotations.js";
+import { hasSquare } from "../utils/boardAnnotations.js";
+import BoardAnnotationsOverlay from "../components/BoardAnnotationsOverlay.jsx";
 
 const FILES = "abcdefgh";
 
@@ -237,6 +240,7 @@ export default function LocalGamePage() {
   const viewStatus = isReviewing && stackIdx >= 0
     ? historyStack[stackIdx].status
     : status;
+  const annotations = useBoardAnnotations(viewBoard);
 
   const isGameOver = status === "checkmate" || status === "stalemate";
   const winner = status === "checkmate" ? (turn === "w" ? "b" : "w") : null;
@@ -290,7 +294,7 @@ export default function LocalGamePage() {
             <div style={{display:"flex",flexDirection:"column"}}>
               {[8,7,6,5,4,3,2,1].map((r) => <div key={r} className="board-rank-label">{r}</div>)}
             </div>
-            <div className="board">
+            <div className="board" {...annotations.boardHandlers}>
               {viewBoard.map((row, ri) =>
                 row.map((piece, ci) => {
                   const isLight = (ri + ci) % 2 === 0;
@@ -314,6 +318,7 @@ export default function LocalGamePage() {
                     isPieceOfCurrentTurn && "piece-grabbable",
                     isDragging && "dragging",
                     isInCheck && "in-check",
+                    hasSquare(annotations.squares, ri, ci) && "marked",
                   ].filter(Boolean).join(" ");
                   return (
                     <div
@@ -331,6 +336,7 @@ export default function LocalGamePage() {
                   );
                 })
               )}
+              <BoardAnnotationsOverlay arrows={annotations.arrows} preview={annotations.preview} />
             </div>
           </div>
           {/* Navigation buttons + move counter */}
@@ -381,6 +387,8 @@ export default function LocalGamePage() {
               Includes all standard rules: castling, en passant, pawn promotion, check, checkmate, and stalemate detection.
               <br /><br />
               Use <strong>← →</strong> arrow keys (or the ‹ › buttons) to step through move history.
+              <br /><br />
+              Right-click a square to highlight it, or right-click and drag to draw an arrow. Left-click the board to clear them.
             </div>
           </div>
         </div>
