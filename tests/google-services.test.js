@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { googleConfig, readConsent, requestAd, trackPage } from "../web/src/utils/googleServices.js";
+import { adsTxt, googleConfig, readConsent, requestAd, trackPage } from "../web/src/utils/googleServices.js";
 
 function browser(t) {
   const scripts = new Map();
@@ -25,14 +25,22 @@ function browser(t) {
 }
 
 test("Google settings default to disabled and reject malformed IDs", () => {
-  assert.deepEqual(googleConfig({}), { analyticsId: "", adsClient: "", leftSlot: "", rightSlot: "" });
+  assert.deepEqual(googleConfig({}), { analyticsId: "", adsClient: "", leftSlot: "", rightSlot: "", inlineSlot: "" });
   assert.deepEqual(googleConfig({
     VITE_GA_ID: 'G-test<script>', VITE_ADSENSE_CLIENT_ID: "ca-pub-fake",
-    VITE_ADSENSE_LEFT_SLOT: "invalid", VITE_ADSENSE_RIGHT_SLOT: "-1",
+    VITE_ADSENSE_LEFT_SLOT: "invalid", VITE_ADSENSE_RIGHT_SLOT: "-1", VITE_ADSENSE_INLINE_SLOT: "1 2",
   }), googleConfig({}));
+  assert.equal(googleConfig({ VITE_ADSENSE_INLINE_SLOT: "1234567890" }).inlineSlot, "1234567890");
   assert.equal(googleConfig({ VITE_GA_ID: "G-ABC123" }).analyticsId, "G-ABC123");
   assert.equal(googleConfig({ VITE_ADSENSE_CLIENT_ID: "ca-pub-1234567890123456" }).adsClient,
     "ca-pub-1234567890123456");
+});
+
+test("ads.txt is generated only for a valid publisher ID", () => {
+  assert.equal(adsTxt(googleConfig({})), "");
+  assert.equal(adsTxt(googleConfig({ VITE_ADSENSE_CLIENT_ID: "ca-pub-fake" })), "");
+  assert.equal(adsTxt(googleConfig({ VITE_ADSENSE_CLIENT_ID: "ca-pub-1234567890123456" })),
+    "google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0\n");
 });
 
 test("privacy defaults to no consent when storage is missing, corrupt or blocked", t => {

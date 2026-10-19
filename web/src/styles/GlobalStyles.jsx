@@ -62,6 +62,8 @@ export default function GlobalStyles() { return (
     .ad-rail { display: none; width: 160px; margin: 1.5rem auto; }
     .ad-label { text-align: center; font-size: 0.65rem; color: var(--muted); margin-bottom: 0.5rem; }
     .ad-placeholder { height: 600px; border: 1px dashed var(--border); display: grid; place-items: center; font-size: 0.75rem; color: var(--muted); }
+    .ad-inline { width: 100%; max-width: 970px; margin: 1rem auto; padding: 0 1rem; }
+    .ad-inline .ad-placeholder { height: 100px; }
     .site-footer { padding: 1rem; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 1rem; font-size: 0.8rem; border-top: 1px solid var(--border); }
     .privacy-panel { padding: 1.5rem; background: white; border-top: 2px solid var(--gold); }
     .privacy-panel p { max-width: 80ch; margin: 0.75rem 0; font-size: 0.85rem; }
@@ -73,6 +75,7 @@ export default function GlobalStyles() { return (
     @media (min-width: 1500px) {
       .site-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr) 180px; }
       .ad-rail { display: block; }
+      .ad-inline { display: none; }
     }
 
     /* ── Sidebar ── */

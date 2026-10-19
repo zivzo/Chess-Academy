@@ -29,16 +29,24 @@ Google Analytics 4
   Google Analytics measures traffic; it does not rate sites or improve rankings.
 
 AdSense
-- Obtain Google's site approval, a ca-pub- publisher ID and TWO display ad
-  unit IDs. Configure VITE_ADSENSE_CLIENT_ID, VITE_ADSENSE_LEFT_SLOT and
-  VITE_ADSENSE_RIGHT_SLOT. Use units supporting 160 x 600 display ads.
+- Set VITE_ADSENSE_CLIENT_ID to your ca-pub- publisher ID and rebuild. The
+  build then adds the google-adsense-account verification meta tag to
+  index.html (no script or cookie is loaded before consent) and generates
+  ads.txt, so Google can review the site for approval.
+- After approval, create THREE display ad units and configure
+  VITE_ADSENSE_LEFT_SLOT and VITE_ADSENSE_RIGHT_SLOT (units supporting
+  160 x 600 display ads) and VITE_ADSENSE_INLINE_SLOT (a responsive unit).
 - Left and right rails appear at viewport widths of 1500px and above, outside
-  the learning controls. Narrow screens hide them and do not request new ads.
-  Hidden rails do not undo requests already made at a wider viewport.
+  the learning controls. Narrower screens (laptops, tablets, phones) show the
+  responsive inline unit below the content instead. Hidden units do not
+  request new ads, and do not undo requests already made at another width.
 - Empty settings or rejected consent show labeled advertising space, not live
   ads. An unapproved account or an ad blocker must not prevent chess use.
-- Download the exact ads.txt entry supplied by your AdSense account, place
-  it in web/public/ads.txt and rebuild. Do not invent a publisher ID.
+- The generated ads.txt uses Google's standard entry for your publisher ID.
+  If your AdSense account shows a different entry, place that exact file in
+  web/public/ads.txt and rebuild; it then replaces the generated one.
+  ads.txt must be reachable at the domain root (https://example.com/ads.txt),
+  so ads need a root-domain deployment, not a GitHub Pages project subpath.
 - BEFORE enabling ads, review Google's current publisher/consent policies.
   Deploy a Google-certified CMP where required (including EEA, UK and
   Switzerland), and connect its signals to the ad-loading permission.
