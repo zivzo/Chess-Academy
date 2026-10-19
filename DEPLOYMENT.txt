@@ -33,13 +33,18 @@ AdSense
   build then adds the google-adsense-account verification meta tag to
   index.html (no script or cookie is loaded before consent) and generates
   ads.txt, so Google can review the site for approval.
-- After approval, create THREE display ad units and configure
-  VITE_ADSENSE_LEFT_SLOT and VITE_ADSENSE_RIGHT_SLOT (units supporting
-  160 x 600 display ads) and VITE_ADSENSE_INLINE_SLOT (a responsive unit).
-- Left and right rails appear at viewport widths of 1500px and above, outside
-  the learning controls. Narrower screens (laptops, tablets, phones) show the
-  responsive inline unit below the content instead. Hidden units do not
-  request new ads, and do not undo requests already made at another width.
+- After approval, create THREE responsive display ad units and configure
+  VITE_ADSENSE_LEFT_SLOT, VITE_ADSENSE_RIGHT_SLOT and
+  VITE_ADSENSE_INLINE_SLOT. The left and right rails set an exact size with
+  CSS: 160 x 600 at 1280-1799px wide and 300 x 600 from 1800px. (A fixed
+  160 x 600 unit also works but leaves the wider rail partly empty.)
+- Left and right rails appear at viewport widths of 1280px and above, outside
+  the learning controls; the lesson sidebar narrows below 1600px so the board
+  keeps its full size. When the window is at least 760px tall, the rails stay
+  in view (sticky) while scrolling without covering content. Narrower
+  screens (tablets, phones) show the responsive inline unit below the content
+  instead. Hidden units do not request new ads, and do not undo requests
+  already made at another width.
 - Empty settings or rejected consent show labeled advertising space, not live
   ads. An unapproved account or an ad blocker must not prevent chess use.
 - The generated ads.txt uses Google's standard entry for your publisher ID.

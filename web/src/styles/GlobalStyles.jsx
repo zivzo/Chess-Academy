@@ -60,6 +60,7 @@ export default function GlobalStyles() { return (
     .site-layout { flex: 1; width: 100%; max-width: 1920px; margin: 0 auto; }
     .main { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-width: 0; min-height: calc(100vh - 64px); }
     .ad-rail { display: none; width: 160px; margin: 1.5rem auto; }
+    .ad-rail .adsbygoogle { display: block; width: 100%; height: 600px; }
     .ad-label { text-align: center; font-size: 0.65rem; color: var(--muted); margin-bottom: 0.5rem; }
     .ad-placeholder { height: 600px; border: 1px dashed var(--border); display: grid; place-items: center; font-size: 0.75rem; color: var(--muted); }
     .ad-inline { width: 100%; max-width: 970px; margin: 1rem auto; padding: 0 1rem; }
@@ -72,10 +73,21 @@ export default function GlobalStyles() { return (
     .skip-link:focus { top: 0.5rem; }
     :focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 
-    @media (min-width: 1500px) {
-      .site-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr) 180px; }
-      .ad-rail { display: block; }
+    /* ── Ad rails: 160×600 from 1280px, 300×600 from 1800px, sticky when tall enough ── */
+    @media (min-width: 1280px) {
+      .site-layout { display: grid; grid-template-columns: 176px minmax(0, 1fr) 176px; }
+      .ad-rail { display: block; align-self: start; }
       .ad-inline { display: none; }
+    }
+    @media (min-width: 1280px) and (max-width: 1599px) {
+      .main { grid-template-columns: 210px minmax(0, 1fr); }
+    }
+    @media (min-width: 1800px) {
+      .site-layout { grid-template-columns: 316px minmax(0, 1fr) 316px; }
+      .ad-rail { width: 300px; }
+    }
+    @media (min-width: 1280px) and (min-height: 760px) {
+      .ad-rail { position: sticky; top: calc(64px + 1.5rem); }
     }
 
     /* ── Sidebar ── */

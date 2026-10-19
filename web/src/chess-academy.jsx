@@ -25,8 +25,9 @@ const PAGE_TITLES = {
 };
 
 const AD_SLOTS = {
-  left: { slot: GOOGLE.leftSlot, className: "ad-rail ad-left", style: { display: "block", width: 160, height: 600 } },
-  right: { slot: GOOGLE.rightSlot, className: "ad-rail ad-right", style: { display: "block", width: 160, height: 600 } },
+  // Rail size comes from CSS (160×600 or 300×600 by viewport width).
+  left: { slot: GOOGLE.leftSlot, className: "ad-rail ad-left" },
+  right: { slot: GOOGLE.rightSlot, className: "ad-rail ad-right" },
   inline: { slot: GOOGLE.inlineSlot, className: "ad-inline", style: { display: "block" }, responsive: true },
 };
 
